@@ -77,7 +77,7 @@ static void flip_cover_work(struct work_struct *work)
 
 	if (first == second) {
 		flip_cover = first;
-		input_report_switch(ddata->input, SW_LID, flip_cover);
+		input_report_switch(ddata->input, SW_LID, !flip_cover);
 		input_sync(ddata->input);
 	}
 }
@@ -97,7 +97,7 @@ static void flip_cover_work(struct work_struct *work)
 
 	flip_cover = first;
 	input_report_switch(ddata->input,
-			SW_LID, ddata->flip_cover);
+			SW_LID, !ddata->flip_cover);
 	input_sync(ddata->input);
 #else
 	ddata->flip_cover = !gpio_get_value(ddata->gpio_flip_cover_key1) & !gpio_get_value(ddata->gpio_flip_cover_key2);
