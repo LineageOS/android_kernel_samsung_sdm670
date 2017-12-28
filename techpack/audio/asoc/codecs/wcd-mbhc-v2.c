@@ -1276,7 +1276,10 @@ static int wcd_mbhc_initialise(struct wcd_mbhc *mbhc)
 	WCD_MBHC_RSC_LOCK(mbhc);
 
 	/* enable HS detection */
-	if (mbhc->mbhc_cb->hph_pull_up_control)
+	if (mbhc->mbhc_cb->hph_pull_up_control_v2)
+		mbhc->mbhc_cb->hph_pull_up_control_v2(codec,
+						      HS_PULLUP_I_DEFAULT);
+	else if (mbhc->mbhc_cb->hph_pull_up_control)
 		mbhc->mbhc_cb->hph_pull_up_control(codec, I_DEFAULT);
 	else
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_HS_L_DET_PULL_UP_CTRL, 3);
@@ -1293,7 +1296,10 @@ static int wcd_mbhc_initialise(struct wcd_mbhc *mbhc)
 		mbhc->hphl_swh = 1;
 		mbhc->gnd_swh = 1;
 
-		if (mbhc->mbhc_cb->hph_pull_up_control)
+		if (mbhc->mbhc_cb->hph_pull_up_control_v2)
+			mbhc->mbhc_cb->hph_pull_up_control_v2(codec,
+							      HS_PULLUP_I_OFF);
+		else if (mbhc->mbhc_cb->hph_pull_up_control)
 			mbhc->mbhc_cb->hph_pull_up_control(codec, I_OFF);
 		else
 			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_HS_L_DET_PULL_UP_CTRL,
