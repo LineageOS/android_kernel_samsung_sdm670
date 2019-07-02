@@ -603,12 +603,14 @@ void lim_deactivate_timers(tpAniSirGlobal mac_ctx)
 		pe_err("Disassoc timer running call the timeout API");
 		lim_timer_handler(mac_ctx, SIR_LIM_DISASSOC_ACK_TIMEOUT);
 	}
+
 	tx_timer_deactivate(&lim_timer->gLimDisassocAckTimer);
 
 	if (tx_timer_running(&lim_timer->gLimDeauthAckTimer)) {
 		pe_err("Deauth timer running call the timeout API");
 		lim_timer_handler(mac_ctx, SIR_LIM_DEAUTH_ACK_TIMEOUT);
 	}
+
 	tx_timer_deactivate(&lim_timer->gLimDeauthAckTimer);
 
 	tx_timer_deactivate(&lim_timer->

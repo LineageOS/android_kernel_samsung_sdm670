@@ -324,6 +324,9 @@ static int mdss_smmu_map_dma_buf_v2(struct dma_buf *dma_buf,
 {
 	int rc;
 	struct mdss_smmu_client *mdss_smmu = mdss_smmu_get_cb(domain);
+#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
+	int retry_cnt;
+#endif
 
 	if (!mdss_smmu) {
 		pr_err("not able to get smmu context\n");
@@ -332,8 +335,27 @@ static int mdss_smmu_map_dma_buf_v2(struct dma_buf *dma_buf,
 	ATRACE_BEGIN("map_buffer");
 	rc = msm_dma_map_sg_lazy(mdss_smmu->dev, table->sgl, table->nents, dir,
 		dma_buf);
+#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
+	if (!in_interrupt()) {
+		if (rc != table->nents) {
+			for (retry_cnt = 0; retry_cnt < 62 ; retry_cnt++) {
+				/* To wait free page by memory reclaim*/
+				msleep(16);
+
+				pr_err("dma map sg failed : retry (%d)\n", retry_cnt);
+				rc = msm_dma_map_sg_lazy(mdss_smmu->base.dev, table->sgl, table->nents, dir, dma_buf);
+				if (rc == table->nents)
+					break;
+			}
+		}
+	}
+#endif
 	if (rc != table->nents) {
+#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
+		pr_err("dma map sg failed(%d)\n", rc);
+#else
 		pr_err("dma map sg failed\n");
+#endif
 		return -ENOMEM;
 	}
 	ATRACE_END("map_buffer");

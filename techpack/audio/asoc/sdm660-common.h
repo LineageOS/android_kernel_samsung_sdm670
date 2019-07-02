@@ -122,6 +122,11 @@ struct msm_asoc_mach_data {
 	struct mutex cdc_int_mclk0_mutex;
 	struct delayed_work disable_int_mclk0_work;
 	struct afe_clk_set digital_cdc_core_clk;
+	int dmic_ldo_en;
+	int fm_lna_en;
+#ifdef CONFIG_SND_SOC_WCD_MBHC_USB_ANALOG
+	int gnd_sel_gpio;
+#endif /* CONFIG_SND_SOC_WCD_MBHC_USB_ANALOG */
 };
 
 int msm_common_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
@@ -130,6 +135,8 @@ int msm_aux_pcm_snd_startup(struct snd_pcm_substream *substream);
 void msm_aux_pcm_snd_shutdown(struct snd_pcm_substream *substream);
 int msm_mi2s_snd_startup(struct snd_pcm_substream *substream);
 void msm_mi2s_snd_shutdown(struct snd_pcm_substream *substream);
+int msm_tdm_snd_startup(struct snd_pcm_substream *substream);
+void msm_tdm_snd_shutdown(struct snd_pcm_substream *substream);
 int msm_common_snd_controls_size(void);
 void msm_set_codec_reg_done(bool done);
 #endif

@@ -438,7 +438,7 @@
 		qcom,msm-cpudai-tdm-group-id = <37136>;
 		qcom,msm-cpudai-tdm-group-num-ports = <1>;
 		qcom,msm-cpudai-tdm-group-port-id = <36880>;
-		qcom,msm-cpudai-tdm-clk-rate = <1536000>;
+		qcom,msm-cpudai-tdm-clk-rate = <6144000>;
 		qcom,msm-cpudai-tdm-clk-internal = <1>;
 		qcom,msm-cpudai-tdm-sync-mode = <1>;
 		qcom,msm-cpudai-tdm-sync-src = <1>;
@@ -457,7 +457,7 @@
 		qcom,msm-cpudai-tdm-group-id = <37137>;
 		qcom,msm-cpudai-tdm-group-num-ports = <1>;
 		qcom,msm-cpudai-tdm-group-port-id = <36881>;
-		qcom,msm-cpudai-tdm-clk-rate = <1536000>;
+		qcom,msm-cpudai-tdm-clk-rate = <6144000>;
 		qcom,msm-cpudai-tdm-clk-internal = <1>;
 		qcom,msm-cpudai-tdm-sync-mode = <1>;
 		qcom,msm-cpudai-tdm-sync-src = <1>;

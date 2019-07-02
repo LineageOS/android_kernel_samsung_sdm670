@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,6 +13,7 @@
 #include <linux/of.h>
 #include <linux/of_gpio.h>
 #include "cam_flash_soc.h"
+#include "cam_sensor_util.h"
 #include "cam_res_mgr_api.h"
 
 static int32_t cam_get_source_node_info(
@@ -193,31 +194,53 @@ int cam_flash_get_dt_data(struct cam_flash_ctrl *fctrl,
 		return -EINVAL;
 	}
 
+	of_node = fctrl->pdev->dev.of_node;
+
+	rc = cam_soc_util_get_dt_properties(soc_info);
+	if (rc < 0) {
+		CAM_ERR(CAM_FLASH, "Get_dt_properties failed rc %d", rc);
+		return rc;
+	}
+
 	soc_info->soc_private =
 		kzalloc(sizeof(struct cam_flash_private_soc), GFP_KERNEL);
 	if (!soc_info->soc_private) {
 		rc = -ENOMEM;
 		goto release_soc_res;
 	}
-	of_node = fctrl->pdev->dev.of_node;
-
-	rc = cam_soc_util_get_dt_properties(soc_info);
-	if (rc) {
-		CAM_ERR(CAM_FLASH, "Get_dt_properties failed rc %d", rc);
-		goto free_soc_private;
-	}
 
 	rc = cam_get_source_node_info(of_node, fctrl, soc_info->soc_private);
-	if (rc) {
+	if (rc < 0) {
 		CAM_ERR(CAM_FLASH,
 			"cam_flash_get_pmic_source_info failed rc %d", rc);
 		goto free_soc_private;
 	}
+
+#if defined(CONFIG_SAMSUNG_SECURE_CAMERA)
+	if (!soc_info->gpio_data) {
+		CAM_INFO(CAM_FLASH, "No GPIO found");
+		rc = 0;
+		return rc;
+	}
+
+	if (!soc_info->gpio_data->cam_gpio_common_tbl_size) {
+		CAM_INFO(CAM_FLASH, "No GPIO found");
+		return -EINVAL;
+	}
+
+	rc = cam_sensor_util_init_gpio_pin_tbl(soc_info,
+		&fctrl->gpio_num_info);
+
+	if ((rc < 0) || (!fctrl->gpio_num_info)) {
+		CAM_ERR(CAM_FLASH, "No/Error CAM_FLASH GPIOs");
+		goto free_soc_private;
+	}
+#endif
+
 	return rc;
 
 free_soc_private:
 	kfree(soc_info->soc_private);
-	soc_info->soc_private = NULL;
 release_soc_res:
 	cam_soc_util_release_platform_resource(soc_info);
 	return rc;

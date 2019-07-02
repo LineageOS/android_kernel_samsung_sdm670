@@ -863,6 +863,8 @@ bool blk_rq_merge_ok(struct request *rq, struct bio *bio)
 	/* only merge integrity protected bio into ditto rq */
 	if (blk_integrity_merge_bio(rq->q, rq, bio) == false)
 		return false;
+	if (bio->bi_sec_flags & SEC_BYPASS && !(rq->cmd_flags & REQ_BYPASS))
+		return false;
 
 	/* must be using the same buffer */
 	if (req_op(rq) == REQ_OP_WRITE_SAME &&

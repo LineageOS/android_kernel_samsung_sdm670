@@ -9,6 +9,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+#define DEBUG
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -29,10 +30,64 @@
 #include <sound/jack.h>
 #include "wcd-mbhc-legacy.h"
 #include "wcd-mbhc-v2.h"
+#ifdef CONFIG_SND_SOC_WCD_MBHC_EXT_ADC
+#include <linux/qpnp/qpnp-adc.h>
+#include <linux/qpnp/pin.h>
+#endif
+#include "../sdm660-common.h"
+#include "msm-cdc-pinctrl.h"
+
+#ifdef CONFIG_SND_SOC_WCD_MBHC_EXT_ADC
+#define DEFAULT_DET_DEBOUNCE_TIME_MS 50
+#endif
 
 static int det_extn_cable_en;
 module_param(det_extn_cable_en, int, 0664);
 MODULE_PARM_DESC(det_extn_cable_en, "enable/disable extn cable detect");
+
+#ifdef CONFIG_SND_SOC_WCD_MBHC_EXT_ADC
+static int wcd_mbhc_get_adc(struct wcd_mbhc *mbhc)
+{
+	struct qpnp_vadc_result result;
+	int adc_val;
+
+	qpnp_vadc_read(mbhc->earjack_vadc, mbhc->amux_channel, &result);
+	adc_val = ((int)result.physical)/1000;
+	pr_info("%s: adc(%d)\n", __func__, adc_val);
+
+	return adc_val;
+}
+
+static int wcd_mbhc_determine_plug_type (struct wcd_mbhc *mbhc)
+{
+	enum wcd_mbhc_plug_type plug_type = MBHC_PLUG_TYPE_INVALID;
+	int time_left_ms, i;
+	int adc = 0;
+
+	if (mbhc->debounce_time_ms > 0)
+		time_left_ms = mbhc->debounce_time_ms;
+	else
+		time_left_ms = DEFAULT_DET_DEBOUNCE_TIME_MS;
+
+	while (time_left_ms > 0) {
+		usleep_range(10000, 10100);
+		time_left_ms -= 10;
+	}
+
+	adc = wcd_mbhc_get_adc(mbhc);
+	if (adc < 0)
+		pr_err("Unavailable ADC %d\n", adc);
+
+	for (i = 0; i < 4; i++) {
+		if (adc <= mbhc->jack_zones[i].adc_high) {
+			plug_type = mbhc->jack_zones[i].jack_type;
+			break;
+		}
+	}
+
+	return plug_type;
+}
+#endif
 
 static bool wcd_mbhc_detect_anc_plug_type(struct wcd_mbhc *mbhc)
 {
@@ -160,6 +215,7 @@ static int wcd_check_cross_conn(struct wcd_mbhc *mbhc)
 	 */
 	WCD_MBHC_REG_READ(WCD_MBHC_HPHL_SCHMT_RESULT, hphl_sch_res);
 	WCD_MBHC_REG_READ(WCD_MBHC_HPHR_SCHMT_RESULT, hphr_sch_res);
+	pr_info("%s: hphl:%d hphr:%d\n", __func__, hphl_sch_res, hphr_sch_res);
 	if (!(hphl_sch_res || hphr_sch_res)) {
 		plug_type = MBHC_PLUG_TYPE_GND_MIC_SWAP;
 		pr_debug("%s: Cross connection identified\n", __func__);
@@ -174,6 +230,7 @@ static int wcd_check_cross_conn(struct wcd_mbhc *mbhc)
 	return (plug_type == MBHC_PLUG_TYPE_GND_MIC_SWAP) ? true : false;
 }
 
+#ifndef CONFIG_SND_SOC_WCD_MBHC_EXT_ADC
 static bool wcd_is_special_headset(struct wcd_mbhc *mbhc)
 {
 	struct snd_soc_codec *codec = mbhc->codec;
@@ -262,6 +319,7 @@ static bool wcd_is_special_headset(struct wcd_mbhc *mbhc)
 		  mbhc->micbias_enable);
 	return ret;
 }
+#endif
 
 static void wcd_mbhc_update_fsm_source(struct wcd_mbhc *mbhc,
 				       enum wcd_mbhc_plug_type plug_type)
@@ -327,6 +385,7 @@ static void wcd_enable_mbhc_supply(struct wcd_mbhc *mbhc,
 	}
 }
 
+#ifndef CONFIG_SND_SOC_WCD_MBHC_EXT_ADC
 static bool wcd_mbhc_check_for_spl_headset(struct wcd_mbhc *mbhc,
 					   int *spl_hs_cnt)
 {
@@ -377,6 +436,7 @@ static bool wcd_mbhc_check_for_spl_headset(struct wcd_mbhc *mbhc,
 done:
 	return spl_hs;
 }
+#endif
 
 /* should be called under interrupt context that hold suspend */
 static void wcd_schedule_hs_detect_plug(struct wcd_mbhc *mbhc,
@@ -443,20 +503,42 @@ static void wcd_correct_swch_plug(struct work_struct *work)
 	unsigned long timeout;
 	u16 hs_comp_res = 0, hphl_sch = 0, mic_sch = 0, btn_result = 0;
 	bool wrk_complete = false;
+#ifdef CONFIG_SND_SOC_WCD_MBHC_USB_ANALOG
+	struct snd_soc_card *card;
+	struct msm_asoc_mach_data *pdata;
+#endif /* CONFIG_SND_SOC_WCD_MBHC_USB_ANALOG */
+#ifndef CONFIG_SND_SOC_WCD_MBHC_EXT_ADC
+	bool spl_hs = false;
+	bool spl_hs_reported = false;
+	int spl_hs_count = 0;
 	int pt_gnd_mic_swap_cnt = 0;
 	int no_gnd_mic_swap_cnt = 0;
-	bool is_pa_on = false, spl_hs = false, spl_hs_reported = false;
+	int ret = 0;
+#endif
+	bool is_pa_on = false;
 	bool micbias2 = false;
 	bool micbias1 = false;
-	int ret = 0;
-	int rc, spl_hs_count = 0;
 	int cross_conn;
 	int try = 0;
+	int rc;
 
 	pr_debug("%s: enter\n", __func__);
 
 	mbhc = container_of(work, struct wcd_mbhc, correct_plug_swch);
 	codec = mbhc->codec;
+#ifdef CONFIG_SND_SOC_WCD_MBHC_USB_ANALOG
+	card = codec->component.card;
+	pdata = snd_soc_card_get_drvdata(card);
+#endif /* CONFIG_SND_SOC_WCD_MBHC_USB_ANALOG */
+
+#ifdef CONFIG_SND_SOC_WCD_MBHC_USB_ANALOG
+	if (mbhc->sbu_oe_gpio)
+		gpio_set_value(mbhc->sbu_oe_gpio, 0);
+	if (mbhc->ear_sel_gpio)
+		gpio_set_value(mbhc->ear_sel_gpio, 1);
+	if (pdata->gnd_sel_gpio)
+		gpio_set_value(pdata->gnd_sel_gpio, 1);
+#endif
 
 	/*
 	 * Enable micbias/pullup for detection in correct work.
@@ -467,6 +549,9 @@ static void wcd_correct_swch_plug(struct work_struct *work)
 	 */
 
 	wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_MB);
+#ifdef CONFIG_SEC_FACTORY
+	mbhc->micbias_enable = true;
+#endif
 
 	/* Enable HW FSM */
 	WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_FSM_EN, 1);
@@ -480,6 +565,9 @@ static void wcd_correct_swch_plug(struct work_struct *work)
 	WCD_MBHC_REG_READ(WCD_MBHC_BTN_RESULT, btn_result);
 	WCD_MBHC_REG_READ(WCD_MBHC_HS_COMP_RESULT, hs_comp_res);
 
+#ifdef CONFIG_SND_SOC_WCD_MBHC_EXT_ADC
+	plug_type = wcd_mbhc_determine_plug_type(mbhc);
+#else
 	if (!rc) {
 		pr_debug("%s No btn press interrupt\n", __func__);
 		if (!btn_result && !hs_comp_res)
@@ -494,6 +582,7 @@ static void wcd_correct_swch_plug(struct work_struct *work)
 		else
 			plug_type = MBHC_PLUG_TYPE_INVALID;
 	}
+#endif
 
 	do {
 		cross_conn = wcd_check_cross_conn(mbhc);
@@ -576,6 +665,7 @@ correct_plug_type:
 		if (mbhc->mbhc_cb->hph_pa_on_status)
 			is_pa_on = mbhc->mbhc_cb->hph_pa_on_status(codec);
 
+#ifndef CONFIG_SND_SOC_WCD_MBHC_EXT_ADC
 		/*
 		 * instead of hogging system by contineous polling, wait for
 		 * sometime and re-check stop request again.
@@ -591,7 +681,22 @@ correct_plug_type:
 				mbhc->micbias_enable = true;
 			}
 		}
+#endif
 
+#ifdef CONFIG_SND_SOC_WCD_MBHC_EXT_ADC
+		if (plug_type == MBHC_PLUG_TYPE_GND_MIC_SWAP) {
+			/*
+			 * if switch is toggled, check again,
+			 * otherwise report unsupported plug
+			 */
+			if (mbhc->mbhc_cfg->swap_gnd_mic &&
+				mbhc->mbhc_cfg->swap_gnd_mic(codec,
+				true)) {
+				pr_debug("%s: US_EU gpio present,flip switch\n"
+					, __func__);
+			}
+		}
+#else
 		if ((!hs_comp_res) && (!is_pa_on)) {
 			/* Check for cross connection*/
 			ret = wcd_check_cross_conn(mbhc);
@@ -643,9 +748,23 @@ correct_plug_type:
 				}
 			}
 		}
+#endif
 
 		WCD_MBHC_REG_READ(WCD_MBHC_HPHL_SCHMT_RESULT, hphl_sch);
 		WCD_MBHC_REG_READ(WCD_MBHC_MIC_SCHMT_RESULT, mic_sch);
+#if defined(CONFIG_SND_SOC_WCD_MBHC_EXT_ADC)
+		plug_type = wcd_mbhc_determine_plug_type(mbhc);
+		if (plug_type == MBHC_PLUG_TYPE_HIGH_HPH) {
+			pr_debug("%s: cable is extension cable\n", __func__);
+			wrk_complete = true;
+		} else {
+			if (plug_type == MBHC_PLUG_TYPE_HEADSET) {
+				pr_debug("%s: cable is headset\n", __func__);
+				goto report;
+			}
+			wrk_complete = false;
+		}
+#else
 		if (hs_comp_res && !(hphl_sch || mic_sch)) {
 			pr_debug("%s: cable is extension cable\n", __func__);
 			plug_type = MBHC_PLUG_TYPE_HIGH_HPH;
@@ -686,6 +805,7 @@ correct_plug_type:
 			}
 			wrk_complete = false;
 		}
+#endif
 	}
 	if (!wrk_complete && mbhc->btn_press_intr) {
 		pr_debug("%s: Can be slow insertion of headphone\n", __func__);
@@ -707,6 +827,7 @@ correct_plug_type:
 		goto enable_supply;
 	}
 
+#ifndef CONFIG_SND_SOC_WCD_MBHC_EXT_ADC
 	if (plug_type == MBHC_PLUG_TYPE_HIGH_HPH &&
 		(!det_extn_cable_en)) {
 		if (wcd_is_special_headset(mbhc)) {
@@ -716,6 +837,7 @@ correct_plug_type:
 			goto report;
 		}
 	}
+#endif
 
 report:
 	if (wcd_swch_level_remove(mbhc)) {
@@ -739,6 +861,19 @@ enable_supply:
 	else
 		wcd_enable_mbhc_supply(mbhc, plug_type);
 exit:
+#ifdef CONFIG_SND_SOC_WCD_MBHC_USB_ANALOG
+	if (mbhc->hs_detect_work_stop) {
+		if (mbhc->sbu_oe_gpio)
+			gpio_set_value(mbhc->sbu_oe_gpio, 1);
+		if (mbhc->ear_sel_gpio)
+			gpio_set_value(mbhc->ear_sel_gpio, 0);
+		if (pdata->gnd_sel_gpio)
+			gpio_set_value(pdata->gnd_sel_gpio, 0);
+
+		msm_cdc_pinctrl_select_sleep_state(pdata->us_euro_gpio_p);
+	}
+#endif
+
 	if (mbhc->mbhc_cb->mbhc_micbias_control &&
 	    !mbhc->micbias_enable)
 		mbhc->mbhc_cb->mbhc_micbias_control(codec, MIC_BIAS_2,

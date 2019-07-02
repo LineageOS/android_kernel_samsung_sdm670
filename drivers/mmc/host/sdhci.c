@@ -2031,6 +2031,10 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 				mmc_card_sdio(host->mmc->card))
 			sdhci_cfg_irq(host, true, false);
 		spin_unlock_irqrestore(&host->lock, flags);
+#if defined(CONFIG_SEC_HYBRID_TRAY)
+		sdhci_set_power(host, ios->power_mode, ios->vdd);
+		host->ops->set_clock(host, ios->clock);
+#endif
 		return;
 	}
 	spin_unlock_irqrestore(&host->lock, flags);
@@ -3289,7 +3293,7 @@ static int sdhci_get_data_err(struct sdhci_host *host, u32 intmask)
 	} else if (intmask & (SDHCI_INT_DATA_END_BIT | SDHCI_INT_DATA_CRC)) {
 		host->mmc->err_stats[MMC_ERR_DAT_CRC]++;
 		return -EILSEQ;
-	} else if (intmask & MMC_ERR_ADMA) {
+	} else if (intmask & SDHCI_INT_ADMA_ERROR) {
 		host->mmc->err_stats[MMC_ERR_ADMA]++;
 		return -EIO;
 	}

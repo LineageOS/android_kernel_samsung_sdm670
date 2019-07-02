@@ -278,6 +278,8 @@ end:
 }
 
 static struct snd_soc_ops msm_tdm_be_ops = {
+	.startup = msm_tdm_snd_startup,
+	.shutdown = msm_tdm_snd_shutdown,
 	.hw_params = msm_tdm_snd_hw_params
 };
 

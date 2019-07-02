@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, 2016-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, 2016-2017, 2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -99,8 +99,10 @@ static ssize_t ath_procfs_diag_read(struct file *file, char __user *buf,
 	}
 
 out:
-	if (rv)
+	if (rv) {
+		qdf_mem_free(read_buffer); 
 		return -EIO;
+	}
 
 	if (copy_to_user(buf, read_buffer, count)) {
 		qdf_mem_free(read_buffer);
@@ -193,7 +195,11 @@ int athdiag_procfs_init(void *scn)
 		return -ENOMEM;
 	}
 
+#ifdef CONFIG_SEC
+	proc_file = proc_create_data(PROCFS_NAME, 0666, proc_dir,
+#else
 	proc_file = proc_create_data(PROCFS_NAME, 0600, proc_dir,
+#endif /* CONFIG_SEC */
 				     &athdiag_fops, (void *)scn);
 	if (proc_file == NULL) {
 		remove_proc_entry(PROCFS_NAME, proc_dir);

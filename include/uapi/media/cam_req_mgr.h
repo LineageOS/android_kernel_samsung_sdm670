@@ -24,6 +24,8 @@
 #define CAM_FLASH_DEVICE_TYPE     (CAM_DEVICE_TYPE_BASE + 11)
 #define CAM_EEPROM_DEVICE_TYPE    (CAM_DEVICE_TYPE_BASE + 12)
 #define CAM_OIS_DEVICE_TYPE       (CAM_DEVICE_TYPE_BASE + 13)
+#define CAM_APERTURE_DEVICE_TYPE  (CAM_DEVICE_TYPE_BASE + 14)
+
 
 /* cam_req_mgr hdl info */
 #define CAM_REQ_MGR_HDL_IDX_POS           8
@@ -43,7 +45,7 @@
 /* Specific event ids to get notified in user space */
 #define V4L_EVENT_CAM_REQ_MGR_SOF            0
 #define V4L_EVENT_CAM_REQ_MGR_ERROR          1
-#define V4L_EVENT_CAM_REQ_MGR_SOF_BOOT_TS    2
+#define V4L_EVENT_CAM_REQ_MGR_MAX         2
 
 /* SOF Event status */
 #define CAM_REQ_MGR_SOF_EVENT_SUCCESS           0

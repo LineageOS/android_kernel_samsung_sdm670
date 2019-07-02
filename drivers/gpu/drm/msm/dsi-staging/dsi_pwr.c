@@ -111,7 +111,8 @@ static int dsi_pwr_parse_supply_node(struct device_node *root,
 			regs->vregs[i].post_off_sleep = tmp;
 		}
 
-		pr_debug("[%s] minv=%d maxv=%d, en_load=%d, dis_load=%d\n",
+		pr_err("[%s] [%s] minv=%d maxv=%d, en_load=%d, dis_load=%d\n",
+			__func__,
 			 regs->vregs[i].vreg_name,
 			 regs->vregs[i].min_voltage,
 			 regs->vregs[i].max_voltage,
@@ -294,10 +295,14 @@ int dsi_pwr_get_dt_vreg_data(struct device *dev,
 	of_node = dev->of_node;
 	regs->count = 0;
 	supply_root_node = of_get_child_by_name(of_node, supply_name);
+
+	// KR_TODO
+	pr_err("%s : supp name : %s\n", __func__, supply_name);
+
 	if (!supply_root_node) {
 		supply_root_node = of_parse_phandle(of_node, supply_name, 0);
 		if (!supply_root_node) {
-			pr_debug("No supply entry present for %s\n",
+			pr_err("No supply entry present for %s\n",
 					supply_name);
 			return -EINVAL;
 		}

@@ -416,6 +416,7 @@ enum {
 	EXT_EC_REF_QUAT_MI2S_TX,
 	EXT_EC_REF_QUIN_MI2S_TX,
 	EXT_EC_REF_SLIM_1_TX,
+	EXT_EC_REF_SEC_TDM_TX,
 };
 
 #define INVALID_SESSION -1
@@ -525,4 +526,8 @@ int msm_pcm_routing_reg_stream_app_type_cfg(
 int msm_pcm_routing_get_stream_app_type_cfg(
 	int fedai_id, int session_type, int *be_id,
 	struct msm_pcm_stream_app_type_cfg *cfg_data);
+#ifdef CONFIG_SEC_SND_ADAPTATION
+int q6audio_get_copp_idx_from_port_id(int port_id, int func_type,
+	int sb_val, int *copp_idx);
+#endif /* CONFIG_SEC_SND_ADAPTATION */
 #endif /*_MSM_PCM_H*/

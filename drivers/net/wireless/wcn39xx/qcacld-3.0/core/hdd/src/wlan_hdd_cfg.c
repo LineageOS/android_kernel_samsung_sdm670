@@ -38,6 +38,11 @@
 #include <cds_concurrency.h>
 #include <linux/ctype.h>
 
+#ifdef SEC_CONFIG_POWER_BACKOFF
+bool wlan_hdd_sec_get_grip_power(unsigned int *grip_power_2g, unsigned int *grip_power_5g);
+#define MAX_RETRY 5
+#endif
+
 static void
 cb_notify_set_roam_prefer5_g_hz(hdd_context_t *pHddCtx, unsigned long notifyId)
 {
@@ -6007,13 +6012,12 @@ static int parse_hex_digit(char c)
  *
  * Return: None
  */
-static QDF_STATUS update_mac_from_string(hdd_context_t *pHddCtx,
-					 tCfgIniEntry *macTable, int num)
+static void update_mac_from_string(hdd_context_t *pHddCtx,
+				   tCfgIniEntry *macTable, int num)
 {
 	int i = 0, j = 0, res = 0;
 	char *candidate = NULL;
 	struct qdf_mac_addr macaddr[QDF_MAX_CONCURRENCY_PERSONA];
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	memset(macaddr, 0, sizeof(macaddr));
 
@@ -6031,13 +6035,34 @@ static QDF_STATUS update_mac_from_string(hdd_context_t *pHddCtx,
 				     provisioned_mac_addr[i].bytes[0],
 				     (uint8_t *) &macaddr[i].bytes[0],
 				     QDF_MAC_ADDR_SIZE);
-		} else {
-			status = QDF_STATUS_E_FAILURE;
-			break;
 		}
 	}
-	return status;
 }
+
+#ifdef SEC_CONFIG_POWER_BACKOFF
+#define SEC_GRIPPOWER_FILEPATH	"/vendor/firmware/wlan/qca_cld/grippower.info"
+bool wlan_hdd_sec_get_grip_power(unsigned int *grip_power_2g, unsigned int *grip_power_5g)
+{
+    struct file *fp    = NULL;
+    char *filepath     = SEC_GRIPPOWER_FILEPATH;
+    char buf[16]        = {0};
+    int i;
+    bool status      = false;
+    for (i = 0; i < 5; ++i) {
+        fp = filp_open(filepath, O_RDONLY, 0);
+        if (!IS_ERR(fp)) {
+            kernel_read(fp, 0, buf, 5);
+            sscanf(buf, "%d:%d", (unsigned int *)grip_power_2g, (unsigned int *)grip_power_5g);
+            printk("[WIFI] GRIPPOWER: [%u:%u]\n", *grip_power_2g, *grip_power_5g);
+            status = true;
+            break;
+        }
+    }
+    if (fp && !IS_ERR(fp))
+        filp_close(fp, NULL);
+    return status;
+}
+#endif
 
 /**
  * hdd_apply_cfg_ini() - apply the ini configuration file
@@ -6068,6 +6093,9 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 	uint32_t cbOutString;
 	int i;
 	int rv;
+#ifdef SEC_CONFIG_PSM_SYSFS
+	int is_rfmode_off = wlan_hdd_sec_get_psm();
+#endif /* SEC_CONFIG_PSM_SYSFS */
 
 	BUILD_BUG_ON(MAX_CFG_INI_ITEMS < cRegTableEntries);
 
@@ -6144,6 +6172,24 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 					value = pRegEntry->VarDefault;
 				}
 			}
+#ifdef SEC_CONFIG_PSM_SYSFS
+			if (!strcmp(pRegEntry->RegName, CFG_ENABLE_IMPS_NAME) || !strcmp(pRegEntry->RegName, CFG_ENABLE_PS_NAME)) {
+				printk("[WIFI] %s: original_value  = %u", pRegEntry->RegName, value);
+				if(!is_rfmode_off)
+					value = 0;
+				printk("[WIFI] %s: sec_control_psm = %u", pRegEntry->RegName, value);
+			}
+			// newly added for LFR enabling,disabling.
+			if (!strcmp(pRegEntry->RegName, CFG_LFR_FEATURE_ENABLED_NAME) ||
+				!strcmp(pRegEntry->RegName, CFG_FAST_TRANSITION_ENABLED_NAME) ||
+				!strcmp(pRegEntry->RegName, CFG_FW_RSSI_MONITORING_NAME)) {
+				printk("[WIFI] %s: original_value  = %u", pRegEntry->RegName, value);
+				if(!is_rfmode_off)
+					value = 0;
+				printk("[WIFI] %s: sec_control_psm = %u", pRegEntry->RegName, value);
+			}
+#endif /* SEC_CONFIG_PSM_SYSFS */
+
 			/* Move the variable into the output field. */
 			memcpy(pField, &value, pRegEntry->VarSize);
 		} else if (WLAN_PARAM_SignedInteger == pRegEntry->RegType) {
@@ -7786,7 +7832,7 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
  */
 QDF_STATUS hdd_update_mac_config(hdd_context_t *pHddCtx)
 {
-	int status, i = 0;
+	int status , i = 0;
 	const struct firmware *fw = NULL;
 	char *line, *buffer = NULL;
 	char *temp = NULL;
@@ -7864,7 +7910,7 @@ QDF_STATUS hdd_update_mac_config(hdd_context_t *pHddCtx)
 		buffer = line;
 	}
 
-	if (i != 0 && i <= QDF_MAX_CONCURRENCY_PERSONA) {
+	if (i <= QDF_MAX_CONCURRENCY_PERSONA) {
 		hdd_debug("%d Mac addresses provided", i);
 	} else {
 		hdd_err("invalid number of Mac address provided, nMac = %d", i);
@@ -7872,11 +7918,7 @@ QDF_STATUS hdd_update_mac_config(hdd_context_t *pHddCtx)
 		goto config_exit;
 	}
 
-	qdf_status = update_mac_from_string(pHddCtx, &macTable[0], i);
-	if (QDF_IS_STATUS_ERROR(qdf_status)) {
-		hdd_err("Invalid MAC addresses provided");
-		goto config_exit;
-	}
+	update_mac_from_string(pHddCtx, &macTable[0], i);
 	pHddCtx->num_provisioned_addr = i;
 	hdd_debug("Populating remaining %d Mac addreses",
 		   max_mac_addr - i);
@@ -7890,7 +7932,6 @@ QDF_STATUS hdd_update_mac_config(hdd_context_t *pHddCtx)
 		qdf_mem_copy(&customMacAddr,
 			     &pHddCtx->derived_mac_addr[0].bytes[0],
 			     sizeof(tSirMacAddr));
-
 	sme_set_custom_mac_addr(customMacAddr);
 
 config_exit:

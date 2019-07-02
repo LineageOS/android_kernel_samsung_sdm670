@@ -40,6 +40,9 @@
 #include "wma_types.h"
 #include "cds_concurrency.h"
 #include "wlan_hdd_scan.h"
+#ifdef SEC_CONFIG_POWER_BACKOFF
+#include <wlan_hdd_ioctl.h>
+#endif /* SEC_CONFIG_POWER_BACKOFF */
 
 
 
@@ -700,7 +703,6 @@ void hdd_tdls_context_init(hdd_context_t *hdd_ctx, bool ssr)
 	hdd_ctx->set_state_info.vdev_id = 0;
 	hdd_ctx->tdls_nss_teardown_complete = false;
 	hdd_ctx->tdls_nss_transition_mode = TDLS_NSS_TRANSITION_UNKNOWN;
-	hdd_ctx->enable_tdls_in_fw = true;
 
 	if (false == hdd_ctx->config->fEnableTDLSImplicitTrigger) {
 		hdd_ctx->tdls_mode = eTDLS_SUPPORT_EXPLICIT_TRIGGER_ONLY;
@@ -6555,6 +6557,9 @@ void hdd_tdls_notify_hw_mode_change(bool is_dbs_hw_mode)
 				       eTDLS_SUPPORT_DISABLED,
 				       false,
 				       HDD_SET_TDLS_MODE_SOURCE_POLICY_MGR);
+#ifdef SEC_CONFIG_POWER_BACKOFF
+		hdd_set_sar_power_limit(hdd_ctx, SAR_POWER_LIMIT_FOR_DBS, 1);
+#endif /* SEC_CONFIG_POWER_BACKOFF */
 		return;
 	}
 
@@ -6589,6 +6594,9 @@ revert_tdls_mode:
 		}
 		wlan_hdd_tdls_set_mode(hdd_ctx, tdls_mode, false,
 				       HDD_SET_TDLS_MODE_SOURCE_POLICY_MGR);
+#ifdef SEC_CONFIG_POWER_BACKOFF
+		hdd_set_sar_power_limit(hdd_ctx, SAR_POWER_LIMIT_FOR_DBS, 0);
+#endif /* SEC_CONFIG_POWER_BACKOFF */
 	}
 }
 

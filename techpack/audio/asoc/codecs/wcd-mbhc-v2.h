@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -141,7 +141,7 @@ do {                                                    \
 #define HS_DETECT_PLUG_TIME_MS (3 * 1000)
 #define SPECIAL_HS_DETECT_TIME_MS (2 * 1000)
 #define MBHC_BUTTON_PRESS_THRESHOLD_MIN 250
-#define GND_MIC_SWAP_THRESHOLD 4
+#define GND_MIC_SWAP_THRESHOLD 2
 #define GND_MIC_USBC_SWAP_THRESHOLD 2
 #define WCD_FAKE_REMOVAL_MIN_PERIOD_MS 100
 #define HS_VREF_MIN_VAL 1400
@@ -399,6 +399,22 @@ enum mbhc_hs_pullup_iref {
 	I_3P0_UA,
 };
 
+enum mbhc_hs_pullup_iref_v2 {
+	HS_PULLUP_I_DEFAULT = -1,
+	HS_PULLUP_I_3P0_UA = 0,
+	HS_PULLUP_I_2P25_UA,
+	HS_PULLUP_I_1P5_UA,
+	HS_PULLUP_I_0P75_UA,
+	HS_PULLUP_I_1P125_UA = 0x05,
+	HS_PULLUP_I_0P375_UA = 0x07,
+	HS_PULLUP_I_2P0_UA,
+	HS_PULLUP_I_1P0_UA = 0x0A,
+	HS_PULLUP_I_0P5_UA,
+	HS_PULLUP_I_0P25_UA = 0x0F,
+	HS_PULLUP_I_0P125_UA = 0x17,
+	HS_PULLUP_I_OFF,
+};
+
 enum mbhc_moisture_rref {
 	R_OFF,
 	R_24_KOHM,
@@ -495,6 +511,7 @@ struct wcd_mbhc_cb {
 	void (*update_anc_state)(struct snd_soc_codec *codec,
 				 bool enable, int anc_num);
 	bool (*is_anc_on)(struct wcd_mbhc *mbhc);
+	void (*hph_pull_up_control_v2)(struct snd_soc_codec *, int);
 };
 
 struct wcd_mbhc_fn {
@@ -505,6 +522,13 @@ struct wcd_mbhc_fn {
 	void (*wcd_cancel_hs_detect_plug)(struct wcd_mbhc *mbhc,
 					  struct work_struct *work);
 };
+
+#ifdef CONFIG_SND_SOC_WCD_MBHC_EXT_ADC
+struct jack_zone {
+	unsigned int adc_high;
+	unsigned int jack_type;
+};
+#endif
 
 struct wcd_mbhc {
 	/* Delayed work to report long button press */
@@ -590,6 +614,16 @@ struct wcd_mbhc {
 
 	struct wcd_mbhc_fn *mbhc_fn;
 	bool force_linein;
+#ifdef CONFIG_SND_SOC_WCD_MBHC_USB_ANALOG
+	int sbu_oe_gpio;
+	int ear_sel_gpio;
+#endif
+#ifdef CONFIG_SND_SOC_WCD_MBHC_EXT_ADC
+	int debounce_time_ms;
+	uint32_t amux_channel;
+	struct qpnp_vadc_chip *earjack_vadc;
+	struct jack_zone jack_zones[4];
+#endif
 };
 
 void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,

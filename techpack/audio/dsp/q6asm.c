@@ -1099,7 +1099,7 @@ void q6asm_audio_client_free(struct audio_client *ac)
 
 	mutex_lock(&session_lock);
 
-	pr_debug("%s: Session id %d\n", __func__, ac->session);
+	pr_info("%s: Session id %d\n", __func__, ac->session);
 	if (ac->io_mode & SYNC_IO_MODE) {
 		for (loopcnt = 0; loopcnt <= OUT; loopcnt++) {
 			port = &ac->port[loopcnt];
@@ -2717,7 +2717,7 @@ static int __q6asm_open_read(struct audio_client *ac,
 		pr_err("%s: AC APR handle NULL\n", __func__);
 		return -EINVAL;
 	}
-	pr_debug("%s: session[%d]\n", __func__, ac->session);
+	pr_info("%s: session[%d]\n", __func__, ac->session);
 
 	q6asm_add_hdr(ac, &open.hdr, sizeof(open), TRUE);
 	atomic_set(&ac->cmd_state, -1);
@@ -3044,7 +3044,7 @@ static int __q6asm_open_write(struct audio_client *ac, uint32_t format,
 	if (ac->perf_mode != LEGACY_PCM_MODE)
 		open.postprocopo_id = ASM_STREAM_POSTPROCOPO_ID_NONE;
 
-	pr_debug("%s: perf_mode %d asm_topology 0x%x bps %d\n", __func__,
+	pr_info("%s: perf_mode %d asm_topology 0x%x bps %d\n", __func__,
 		 ac->perf_mode, open.postprocopo_id, open.bits_per_sample);
 
 	/*
@@ -3249,7 +3249,7 @@ static int __q6asm_open_read_write(struct audio_client *ac, uint32_t rd_format,
 		pr_err("%s: AC APR handle NULL\n", __func__);
 		return -EINVAL;
 	}
-	pr_debug("%s: session[%d]\n", __func__, ac->session);
+	pr_info("%s: session[%d]\n", __func__, ac->session);
 	pr_debug("%s: wr_format[0x%x]rd_format[0x%x]\n",
 			__func__, wr_format, rd_format);
 

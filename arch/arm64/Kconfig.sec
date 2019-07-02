@@ -1,0 +1,92 @@
+config SEC_GTS4LV_PROJECT
+        depends on ARCH_SDM670
+        default n
+        bool "Samsung GTS4LV Project"
+        help
+          Support for Samsung GTS4LV Project
+
+config SEC_GTS4LV_MEA_PROJECT
+        depends on SEC_GTS4LV_PROJECT
+        default n
+        bool "Samsung GTS4LV MEA Project"
+        help
+          Support for Samsung GTS4LV MEA Project
+
+config SEC_GTS4LV_EUR_PROJECT
+        depends on SEC_GTS4LV_PROJECT
+        default n
+        bool "Samsung GTS4LV EUR OPEN Project"
+        help
+          Support for Samsung GTS4LV EUR OPEN Project
+
+config SEC_GTS4LVWIFI_EUR_PROJECT
+        depends on SEC_GTS4LV_PROJECT
+        default n
+        bool "Samsung GTS4LVWIFI EUR OPEN Project"
+        help
+          Support for Samsung GTS4LVWIFI EUR OPEN Project
+	  
+config SEC_GTS4LVWIFI_EUR_LDU_PROJECT
+        depends on SEC_GTS4LV_PROJECT
+        default n
+        bool "Samsung GTS4LVWIFI EUR LDU Project"
+        help
+          Support for Samsung GTS4LVWIFI EUR LDU Project
+
+config SEC_GTS4LV_KOR_PROJECT
+        depends on SEC_GTS4LV_PROJECT
+        default n
+        bool "Samsung GTS4LV KOR OPEN Project"
+        help
+          Support for Samsung GTS4LV KOR OPEN Project
+
+config SEC_GTS4LV_USA_PROJECT
+        depends on SEC_GTS4LV_PROJECT
+        default n
+        bool "Samsung GTS4LV USA VZW Project"
+        help
+          Support for Samsung GTS4LV USA VZW Project
+
+config SEC_A8SQLTE_PROJECT
+	depends on ARCH_SDM670
+	default n
+	bool "Samsung A8SQLTE Project"
+	help
+	  Support for Samsung A8SQLTE Project
+
+config MACH_A8SQLTE_CHN_OPEN
+	depends on SEC_A8SQLTE_PROJECT
+	default n
+	bool "Samsung A8SQLTE CHN OPEN"
+	help
+	  Support for Samsung A8SQLTE CHN OPEN device.
+
+config MACH_A8SQLTE_CHN_TW
+	depends on SEC_A8SQLTE_PROJECT
+	default n
+	bool "Samsung A8SQLTE CHN TW"
+	help
+	  Support for Samsung A8SQLTE CHN TW device.
+
+config MACH_A8SQLTE_CHN_LDU
+	depends on SEC_A8SQLTE_PROJECT
+	default n
+	bool "Samsung A8SQLTE CHN LDU"
+	help
+	  Support for Samsung A8SQLTE CHN LDU device.
+
+config MACH_A8SQLTE_KOR_SINGLE
+	depends on SEC_A8SQLTE_PROJECT
+	default n
+	bool "Samsung A8SQLTE KOR SINGLE"
+	help
+	  Support for Samsung A8SQLTE KOR SINGLE device.
+
+config MACH_A8SQLTE_KOR_LDU
+	depends on SEC_A8SQLTE_PROJECT
+	default n
+	bool "Samsung A8SQLTE KOR LDU"
+	help
+	  Support for Samsung A8SQLTE KOR LDU device.
+
+

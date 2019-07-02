@@ -2286,7 +2286,14 @@ QDF_STATUS sap_goto_channel_sel(ptSapContext sap_context,
 
 	mac_ctx = PMAC_STRUCT(h_hal);
 
-	if (cds_concurrent_beaconing_sessions_running()) {
+	/*
+	 * Check if concurrent beaconning vdev are present and at least one
+	 * of them is active
+	 */
+	if (cds_concurrent_beaconing_sessions_running() &&
+			(cds_mode_specific_connection_count(CDS_SAP_MODE, NULL) ||
+					cds_mode_specific_connection_count(CDS_P2P_GO_MODE, NULL) ||
+					cds_mode_specific_connection_count(CDS_IBSS_MODE, NULL))) {
 		con_ch =
 			sme_get_concurrent_operation_channel(h_hal);
 #ifdef FEATURE_WLAN_STA_AP_MODE_DFS_DISABLE
@@ -3003,12 +3010,6 @@ QDF_STATUS sap_signal_hdd_event(ptSapContext sap_ctx,
 				  FL("Invalid CSR Roam Info"));
 			return QDF_STATUS_E_INVAL;
 		}
-		if (eSAP_DISCONNECTING == sap_ctx->sapsMachine) {
-			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
-				  "SAP is disconnecting, not able to handle any incoming (re)assoc req");
-			return QDF_STATUS_E_ABORTED;
-		}
-
 		reassoc_complete =
 		    &sap_ap_event.sapevt.sapStationAssocReassocCompleteEvent;
 

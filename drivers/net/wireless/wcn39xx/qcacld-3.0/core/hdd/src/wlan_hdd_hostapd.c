@@ -1441,9 +1441,7 @@ static void hdd_fill_station_info(hdd_adapter_t *pHostapdAdapter,
 				  tSap_StationAssocReassocCompleteEvent *event)
 {
 	hdd_station_info_t *stainfo;
-	uint8_t i = 0, oldest_disassoc_sta_idx = WLAN_MAX_STA_COUNT + 1;
-	qdf_time_t oldest_disassoc_sta_ts = 0;
-
+	uint8_t i = 0;
 
 	if (event->staId >= WLAN_MAX_STA_COUNT) {
 		hdd_err("invalid sta id");
@@ -1505,6 +1503,8 @@ static void hdd_fill_station_info(hdd_adapter_t *pHostapdAdapter,
 				 cache_sta_info[i].macAddrSTA.bytes,
 				 event->staMac.bytes,
 				 QDF_MAC_ADDR_SIZE)) {
+			qdf_mem_zero(&pHostapdAdapter->cache_sta_info[i],
+				     sizeof(*stainfo));
 			break;
 		}
 		i++;
@@ -1515,36 +1515,14 @@ static void hdd_fill_station_info(hdd_adapter_t *pHostapdAdapter,
 		while (i < WLAN_MAX_STA_COUNT) {
 			if (pHostapdAdapter->cache_sta_info[i].isUsed != TRUE)
 				break;
-
-			if (pHostapdAdapter->
-					cache_sta_info[i].disassoc_ts &&
-			    (!oldest_disassoc_sta_ts ||
-			    (qdf_system_time_after(
-					oldest_disassoc_sta_ts,
-					pHostapdAdapter->
-					cache_sta_info[i].disassoc_ts)))) {
-				oldest_disassoc_sta_ts =
-					pHostapdAdapter->
-						cache_sta_info[i].disassoc_ts;
-				oldest_disassoc_sta_idx = i;
-			}
 			i++;
 		}
 	}
-
-	if ((i == WLAN_MAX_STA_COUNT) && oldest_disassoc_sta_ts) {
-		hdd_debug("reached max cached staid, removing oldest stainfo");
-		i = oldest_disassoc_sta_idx;
-	}
-	if (i < WLAN_MAX_STA_COUNT) {
-		qdf_mem_zero(&pHostapdAdapter->cache_sta_info[i],
-			     sizeof(*stainfo));
+	if (i < WLAN_MAX_STA_COUNT)
 		qdf_mem_copy(&pHostapdAdapter->cache_sta_info[i],
-				     stainfo, sizeof(hdd_station_info_t));
-
-	} else {
+			     stainfo, sizeof(hdd_station_info_t));
+	else
 		hdd_debug("reached max staid, stainfo can't be cached");
-	}
 
 	hdd_debug("cap %d %d %d %d %d %d %d %d %d %x %d",
 			stainfo->ampdu,
@@ -1676,7 +1654,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 	eCsrPhyMode phy_mode;
 	bool legacy_phymode;
 	tSap_StationDisassocCompleteEvent *disassoc_comp;
-	hdd_station_info_t *stainfo, *cache_stainfo;
+	hdd_station_info_t *stainfo;
 	cds_context_type *cds_ctx;
 	hdd_adapter_t *sta_adapter;
 	tsap_Config_t *sap_config;
@@ -2132,12 +2110,6 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 	case eSAP_STA_ASSOC_EVENT:
 	case eSAP_STA_REASSOC_EVENT:
 		event = &pSapEvent->sapevt.sapStationAssocReassocCompleteEvent;
-		if (eSAP_STATUS_FAILURE == event->status) {
-			hdd_notice("assoc failure: " MAC_ADDRESS_STR,
-				   MAC_ADDR_ARRAY(wrqu.addr.sa_data));
-			break;
-		}
-
 		wrqu.addr.sa_family = ARPHRD_ETHER;
 		memcpy(wrqu.addr.sa_data,
 		       &event->staMac, QDF_MAC_ADDR_SIZE);
@@ -2292,20 +2264,21 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 		memcpy(wrqu.addr.sa_data,
 		       &disassoc_comp->staMac, QDF_MAC_ADDR_SIZE);
 
-		cache_stainfo = hdd_get_stainfo(pHostapdAdapter->cache_sta_info,
+		stainfo = hdd_get_stainfo(pHostapdAdapter->cache_sta_info,
 					  disassoc_comp->staMac);
-		if (cache_stainfo) {
-			/* Cache the disassoc info */
-			cache_stainfo->rssi = disassoc_comp->rssi;
-			cache_stainfo->tx_rate = disassoc_comp->tx_rate;
-			cache_stainfo->rx_rate = disassoc_comp->rx_rate;
-			cache_stainfo->rx_mc_bc_cnt =
-						disassoc_comp->rx_mc_bc_cnt;
-			cache_stainfo->reason_code = disassoc_comp->reason_code;
-			cache_stainfo->disassoc_ts = qdf_system_ticks();
+		if (!stainfo) {
+			hdd_err("peer " MAC_ADDRESS_STR " not found",
+					MAC_ADDR_ARRAY(wrqu.addr.sa_data));
+			return -EINVAL;
 		}
 		hdd_notice(" disassociated " MAC_ADDRESS_STR,
 				MAC_ADDR_ARRAY(wrqu.addr.sa_data));
+
+		stainfo->rssi = disassoc_comp->rssi;
+		stainfo->tx_rate = disassoc_comp->tx_rate;
+		stainfo->rx_rate = disassoc_comp->rx_rate;
+		stainfo->rx_mc_bc_cnt = disassoc_comp->rx_mc_bc_cnt;
+		stainfo->reason_code = disassoc_comp->reason_code;
 
 		qdf_status = qdf_event_set(&pHostapdState->qdf_sta_disassoc_event);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
@@ -2331,17 +2304,14 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 			pHostapdAdapter->sessionId,
 			QDF_PROTO_TYPE_MGMT, QDF_PROTO_MGMT_DISASSOC));
 
-		stainfo = hdd_get_stainfo(pHostapdAdapter->aStaInfo,
-					  disassoc_comp->staMac);
-		if (stainfo) {
-			/* Send DHCP STOP indication to FW */
-			stainfo->dhcp_phase = DHCP_PHASE_ACK;
-			if (stainfo->dhcp_nego_status ==
-						DHCP_NEGO_IN_PROGRESS)
-				hdd_post_dhcp_ind(pHostapdAdapter, staId,
-						WMA_DHCP_STOP_IND);
-			stainfo->dhcp_nego_status = DHCP_NEGO_STOP;
-		}
+		/* Send DHCP STOP indication to FW */
+		stainfo->dhcp_phase = DHCP_PHASE_ACK;
+		if (stainfo->dhcp_nego_status ==
+					DHCP_NEGO_IN_PROGRESS)
+			hdd_post_dhcp_ind(pHostapdAdapter, staId,
+					WMA_DHCP_STOP_IND);
+		stainfo->dhcp_nego_status = DHCP_NEGO_STOP;
+
 		hdd_softap_deregister_sta(pHostapdAdapter, staId);
 
 		pHddApCtx->bApActive = false;
@@ -7864,14 +7834,10 @@ int wlan_hdd_restore_channels(hdd_context_t *hdd_ctx)
 		 * Restore the orginal states of the channels
 		 * only if we have cached non zero values
 		 */
-		if (cache_chann->channel_info[i].reg_status)
-			cds_set_channel_state(rf_channel,
-					      cache_chann->
-						channel_info[i].reg_status);
-
-		if (cache_chann->channel_info[i].wiphy_status && wiphy_channel)
-			wiphy_channel->flags =
-				cache_chann->channel_info[i].wiphy_status;
+		cds_set_channel_state(rf_channel, 
+		cache_chann->channel_info[i].reg_status); 
+		wiphy_channel->flags = 
+		cache_chann->channel_info[i].wiphy_status; 
 	}
 
 	qdf_mutex_release(&hdd_ctx->cache_channel_lock);
@@ -7969,7 +7935,6 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 	tsap_Config_t *pConfig;
 	beacon_data_t *pBeacon = NULL;
 	struct ieee80211_mgmt *pMgmt_frame;
-	struct ieee80211_mgmt mgmt;
 	uint8_t *pIe = NULL;
 	uint16_t capab_info;
 	eCsrAuthType RSNAuthType;
@@ -7990,7 +7955,6 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 	enum dfs_mode mode;
 	bool disable_fw_tdls_state = false;
 	uint8_t ignore_cac = 0;
-	uint8_t beacon_fixed_len;
 	hdd_adapter_t *sta_adapter;
 
 	ENTER();
@@ -8071,8 +8035,7 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 			hdd_update_indoor_channel(pHddCtx, false);
 			hdd_err("Can't start BSS: update channel list failed");
 			qdf_mem_free(sme_config);
-			ret = -EINVAL;
-			goto enable_roaming;
+			return -EINVAL;
 		}
 
 		/* check if STA is on indoor channel*/
@@ -8081,36 +8044,9 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 								       pHddCtx);
 	}
 
-	if (pHostapdAdapter->device_mode == QDF_SAP_MODE &&
-	    !iniConfig->disable_channel) {
-		/*
-		 * Disable the channels received in command
-		 * SET_DISABLE_CHANNEL_LIST
-		 */
-		status = wlan_hdd_disable_channels(pHddCtx);
-		if (!QDF_IS_STATUS_SUCCESS(status))
-			hdd_err("Disable channel list fail");
-		hdd_check_and_disconnect_sta_on_invalid_channel(pHddCtx);
-	}
-
 	pConfig = &pHostapdAdapter->sessionCtx.ap.sapConfig;
 
 	pBeacon = pHostapdAdapter->sessionCtx.ap.beacon;
-
-	/*
-	 * beacon_fixed_len is the fixed length of beacon
-	 * frame which includes only mac header length and
-	 * beacon manadatory fields like timestamp,
-	 * beacon_int and capab_info.
-	 * (From the reference of struct ieee80211_mgmt)
-	 */
-	beacon_fixed_len = sizeof(mgmt) - sizeof(mgmt.u) +
-			   sizeof(mgmt.u.beacon);
-	if (pBeacon->head_len < beacon_fixed_len) {
-		hdd_err("Invalid beacon head len");
-		ret = -EINVAL;
-		goto error;
-	}
 
 	pMgmt_frame = (struct ieee80211_mgmt *)pBeacon->head;
 
@@ -8431,21 +8367,12 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 
 	if (!(ssid && qdf_str_len(PRE_CAC_SSID) == ssid_len &&
 	      (0 == qdf_mem_cmp(ssid, PRE_CAC_SSID, ssid_len)))) {
-		uint16_t beacon_data_len;
-
-		beacon_data_len = pBeacon->head_len - beacon_fixed_len;
 		pIe = wlan_hdd_cfg80211_get_ie_ptr(
 				&pMgmt_frame->u.beacon.variable[0],
-				beacon_data_len, WLAN_EID_SUPP_RATES);
+				pBeacon->head_len, WLAN_EID_SUPP_RATES);
 
 		if (pIe != NULL) {
 			pIe++;
-			if (pIe[0] > SIR_MAC_RATESET_EID_MAX) {
-				hdd_err("Invalid supported rates %d",
-					pIe[0]);
-				ret = -EINVAL;
-				goto error;
-			}
 			pConfig->supported_rates.numRates = pIe[0];
 			pIe++;
 			for (i = 0;
@@ -8462,12 +8389,6 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 				WLAN_EID_EXT_SUPP_RATES);
 		if (pIe != NULL) {
 			pIe++;
-			if (pIe[0] > SIR_MAC_RATESET_EID_MAX) {
-				hdd_err("Invalid supported rates %d",
-					pIe[0]);
-				ret = -EINVAL;
-				goto error;
-			}
 			pConfig->extended_rates.numRates = pIe[0];
 			pIe++;
 			for (i = 0; i < pConfig->extended_rates.numRates; i++) {
@@ -8581,8 +8502,11 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 		wlansap_reset_sap_config_add_ie(pConfig, eUPDATE_IE_ALL);
 		/* Bss already started. just return. */
 		/* TODO Probably it should update some beacon params. */
+		if (sme_config)
+			qdf_mem_free(sme_config);
 		hdd_debug("Bss Already started...Ignore the request");
-		goto exit;
+		EXIT();
+		return 0;
 	}
 
 	if (check_for_concurrency) {
@@ -8665,8 +8589,6 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 
 	cds_set_connection_in_progress(false);
 	pHostapdState->bCommit = true;
-
-exit:
 	if (sme_config)
 		qdf_mem_free(sme_config);
 

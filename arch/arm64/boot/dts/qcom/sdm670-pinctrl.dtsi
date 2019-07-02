@@ -27,29 +27,29 @@
 				pins = "ufs_reset";
 				bias-pull-down;		/* default: pull down */
 				/*
-				 * UFS_RESET driver strengths are having
-				 * different values/steps compared to typical
-				 * GPIO drive strengths.
-				 *
-				 * Following table clarifies:
-				 *
-				 * HDRV value | UFS_RESET | Typical GPIO
-				 *   (dec)    |   (mA)    |    (mA)
-				 *     0      |   0.8     |    2
-				 *     1      |   1.55    |    4
-				 *     2      |   2.35    |    6
-				 *     3      |   3.1     |    8
-				 *     4      |   3.9     |    10
-				 *     5      |   4.65    |    12
-				 *     6      |   5.4     |    14
-				 *     7      |   6.15    |    16
-				 *
-				 * POR value for UFS_RESET HDRV is 3 which means
-				 * 3.1mA and we want to use that. Hence just
-				 * specify 8mA to "drive-strength" binding and
-				 * that should result into writing 3 to HDRV
-				 * field.
-				 */
+				* UFS_RESET driver strengths are having
+				* different values/steps compared to typical
+				* GPIO drive strengths.
+				*
+				* Following table clarifies:
+				*
+				* HDRV value | UFS_RESET | Typical GPIO
+				*   (dec)    |   (mA)    |    (mA)
+				*     0      |   0.8     |    2
+				*     1      |   1.55    |    4
+				*     2      |   2.35    |    6
+				*     3      |   3.1     |    8
+				*     4      |   3.9     |    10
+				*     5      |   4.65    |    12
+				*     6      |   5.4     |    14
+				*     7      |   6.15    |    16
+				*
+				* POR value for UFS_RESET HDRV is 3 which means
+				* 3.1mA and we want to use that. Hence just
+				* specify 8mA to "drive-strength" binding and
+				* that should result into writing 3 to HDRV
+				* field.
+				*/
 				drive-strength = <8>;	/* default: 3.1 mA */
 				output-low; /* active low reset */
 			};
@@ -276,7 +276,8 @@
 				config {
 					pins = "gpio41", "gpio42";
 					drive-strength = <2>;
-					bias-pull-up;
+					bias-disable;
+					input-enable;
 				};
 			};
 		};
@@ -1222,7 +1223,7 @@
 		sdc1_cmd_on: sdc1_cmd_on {
 			config {
 				pins = "sdc1_cmd";
-				bias-pull-up;		/* pull up */
+				bias-disable;		/* NO pull */
 				drive-strength = <10>;	/* 10 MA */
 			};
 		};
@@ -1231,7 +1232,7 @@
 			config {
 				pins = "sdc1_cmd";
 				num-grp-pins = <1>;
-				bias-pull-up;		/* pull up */
+				bias-disable;		/* NO pull */
 				drive-strength = <2>;	/* 2 MA */
 			};
 		};
@@ -1323,7 +1324,7 @@
 			config {
 				pins = "gpio96";
 				drive-strength = <2>;
-				bias-pull-up;
+				bias-disable;
 			};
 		};
 

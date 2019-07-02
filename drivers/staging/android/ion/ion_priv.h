@@ -111,6 +111,9 @@ struct ion_buffer {
 	int handle_count;
 	char task_comm[TASK_COMM_LEN];
 	pid_t pid;
+
+	char thread_comm[TASK_COMM_LEN];
+	pid_t tid;
 };
 void ion_buffer_destroy(struct ion_buffer *buffer);
 
@@ -218,6 +221,7 @@ struct ion_heap {
 
 	int (*debug_show)(struct ion_heap *heap, struct seq_file *, void *);
 	atomic_long_t total_allocated;
+	atomic_long_t total_allocated_peak;
 	atomic_long_t total_handles;
 };
 
@@ -549,4 +553,6 @@ int ion_handle_put(struct ion_handle *handle);
 
 void show_ion_usage(struct ion_device *dev);
 
+void show_ion_system_heap_size(struct seq_file *s);
+void show_ion_system_heap_pool_size(struct seq_file *s);
 #endif /* _ION_PRIV_H */

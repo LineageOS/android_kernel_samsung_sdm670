@@ -82,7 +82,7 @@ struct _cds_sched_context *gp_cds_sched_context;
 static int cds_mc_thread(void *Arg);
 #ifdef QCA_CONFIG_SMP
 static int cds_ol_rx_thread(void *arg);
-static uint32_t affine_cpu;
+static unsigned long affine_cpu;
 static QDF_STATUS cds_alloc_ol_rx_pkt_freeq(p_cds_sched_context pSchedContext);
 
 #define CDS_CORE_PER_CLUSTER (4)
@@ -322,70 +322,61 @@ int cds_sched_handle_throughput_req(bool high_tput_required)
 	return 0;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0)
 /**
- * cds_cpu_hotplug_multi_cluster() - calls the multi-cluster hotplug handler,
- *	when on a multi-cluster platform
+ * cds_cpu_hotplug_notify() - hot plug notify
+ * @block: Pointer to block
+ * @state: State
+ * @hcpu: Pointer to hotplug cpu
  *
- * Return: QDF_STATUS
+ * Return: NOTIFY_OK
  */
-static QDF_STATUS cds_cpu_hotplug_multi_cluster(void)
+static int
+__cds_cpu_hotplug_notify(struct notifier_block *block,
+		       unsigned long state, void *hcpu)
 {
+	unsigned long cpu = (unsigned long)hcpu;
+	unsigned long pref_cpu = 0;
+	p_cds_sched_context pSchedContext = get_cds_sched_ctxt();
+	int i;
+	unsigned int multi_cluster;
+	unsigned int num_cpus;
+#if defined(WLAN_OPEN_SOURCE) && \
+	 (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0))
 	int cpus;
-	unsigned int multi_cluster = 0;
+#endif
 
-	for_each_online_cpu(cpus) {
-		multi_cluster = topology_physical_package_id(cpus);
-	}
 
-	if (!multi_cluster)
-		return QDF_STATUS_E_NOSUPPORT;
+	if ((NULL == pSchedContext) || (NULL == pSchedContext->ol_rx_thread))
+		return NOTIFY_OK;
 
 	if (cds_is_load_or_unload_in_progress() ||
 	    cds_is_module_stop_in_progress() || cds_is_driver_recovering())
 		return NOTIFY_OK;
 
-	if (cds_sched_handle_cpu_hot_plug())
-		return QDF_STATUS_E_FAILURE;
+	num_cpus = num_possible_cpus();
+	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_LOW,
+		  "%s: RX CORE %d, STATE %d, NUM CPUS %d",
+		  __func__, (int)affine_cpu, (int)state, num_cpus);
+	multi_cluster = 0;
 
-	return QDF_STATUS_SUCCESS;
-}
-#else
-static QDF_STATUS cds_cpu_hotplug_multi_cluster(void)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-#endif /* KERNEL_VERSION(3, 10, 0) */
+#if defined(WLAN_OPEN_SOURCE) && \
+	 (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0))
 
-/**
- * __cds_cpu_hotplug_notify() - CPU hotplug event handler
- * @cpu: CPU Id of the CPU generating the event
- * @cpu_up: true if the CPU is online
- *
- * Return: None
- */
-static void __cds_cpu_hotplug_notify(uint32_t cpu, bool cpu_up)
-{
-	unsigned long pref_cpu = 0;
-	p_cds_sched_context pSchedContext = get_cds_sched_ctxt();
-	int i;
+	for_each_online_cpu(cpus) {
+		multi_cluster =  topology_physical_package_id(cpus);
+	}
+#endif
 
-	if (!pSchedContext || !pSchedContext->ol_rx_thread)
-		return;
+	if ((multi_cluster) &&
+		((CPU_ONLINE == state) || (CPU_DEAD == state))) {
+		cds_sched_handle_cpu_hot_plug();
+		return NOTIFY_OK;
+	}
 
-	if (cds_is_load_or_unload_in_progress())
-		return;
-
-	cds_debug("'%s' event on CPU %u (of %d); Currently affine to CPU %u",
-		  cpu_up ? "Up" : "Down", cpu, num_possible_cpus(), affine_cpu);
-
-	/* try multi-cluster scheduling first */
-	if (QDF_IS_STATUS_SUCCESS(cds_cpu_hotplug_multi_cluster()))
-		return;
-
-	if (cpu_up) {
+	switch (state) {
+	case CPU_ONLINE:
 		if (affine_cpu != 0)
-			return;
+			return NOTIFY_OK;
 
 		for_each_online_cpu(i) {
 			if (i == 0)
@@ -393,9 +384,10 @@ static void __cds_cpu_hotplug_notify(uint32_t cpu, bool cpu_up)
 			pref_cpu = i;
 			break;
 		}
-	} else {
+		break;
+	case CPU_DEAD:
 		if (cpu != affine_cpu)
-			return;
+			return NOTIFY_OK;
 
 		affine_cpu = 0;
 		for_each_online_cpu(i) {
@@ -407,37 +399,45 @@ static void __cds_cpu_hotplug_notify(uint32_t cpu, bool cpu_up)
 	}
 
 	if (pref_cpu == 0)
-		return;
+		return NOTIFY_OK;
 
 	if (pSchedContext->ol_rx_thread &&
 	    !cds_set_cpus_allowed_ptr(pSchedContext->ol_rx_thread, pref_cpu))
 		affine_cpu = pref_cpu;
+
+	return NOTIFY_OK;
 }
 
 /**
- * cds_cpu_hotplug_notify - cpu core up/down notification handler wrapper
- * @cpu: CPU Id of the CPU generating the event
- * @cpu_up: true if the CPU is online
+ * vos_cpu_hotplug_notify - cpu core on-off notification handler wrapper
+ * @block:	notifier block
+ * @state:	state of core
+ * @hcpu:	target cpu core
  *
- * Return: None
+ * pre-registered core status change notify callback function
+ * will handle only ONLINE, OFFLINE notification
+ * based on cpu architecture, rx thread affinity will be different
+ * wrapper function
+ *
+ * Return: 0 success
+ *         1 fail
  */
-static void cds_cpu_hotplug_notify(uint32_t cpu, bool cpu_up)
+static int cds_cpu_hotplug_notify(struct notifier_block *block,
+				unsigned long state, void *hcpu)
 {
+	int ret;
+
 	cds_ssr_protect(__func__);
-	__cds_cpu_hotplug_notify(cpu, cpu_up);
+	ret = __cds_cpu_hotplug_notify(block, state, hcpu);
 	cds_ssr_unprotect(__func__);
+
+	return ret;
 }
 
-static void cds_cpu_online_cb(void *context, uint32_t cpu)
-{
-	cds_cpu_hotplug_notify(cpu, true);
-}
-
-static void cds_cpu_before_offline_cb(void *context, uint32_t cpu)
-{
-	cds_cpu_hotplug_notify(cpu, false);
-}
-#endif /* QCA_CONFIG_SMP */
+static struct notifier_block cds_cpu_hotplug_notifier = {
+	.notifier_call = cds_cpu_hotplug_notify,
+};
+#endif
 
 /**
  * cds_sched_open() - initialize the CDS Scheduler
@@ -512,10 +512,8 @@ QDF_STATUS cds_sched_open(void *p_cds_context,
 	spin_unlock_bh(&pSchedContext->cds_ol_rx_pkt_freeq_lock);
 	if (cds_alloc_ol_rx_pkt_freeq(pSchedContext) != QDF_STATUS_SUCCESS)
 		goto pkt_freeqalloc_failure;
-	qdf_cpuhp_register(&pSchedContext->cpuhp_event_handle,
-			   NULL,
-			   cds_cpu_online_cb,
-			   cds_cpu_before_offline_cb);
+	register_hotcpu_notifier(&cds_cpu_hotplug_notifier);
+	pSchedContext->cpu_hot_plug_notifier = &cds_cpu_hotplug_notifier;
 	mutex_init(&pSchedContext->affinity_lock);
 	pSchedContext->high_throughput_required = false;
 #endif
@@ -580,7 +578,7 @@ OL_RX_THREAD_START_FAILURE:
 MC_THREAD_START_FAILURE:
 
 #ifdef QCA_CONFIG_SMP
-	qdf_cpuhp_unregister(&pSchedContext->cpuhp_event_handle);
+	unregister_hotcpu_notifier(&cds_cpu_hotplug_notifier);
 	cds_free_ol_rx_pkt_freeq(gp_cds_sched_context);
 pkt_freeqalloc_failure:
 #endif
@@ -1325,7 +1323,8 @@ QDF_STATUS cds_sched_close(void *p_cds_context)
 	gp_cds_sched_context->ol_rx_thread = NULL;
 	cds_drop_rxpkt_by_staid(gp_cds_sched_context, WLAN_MAX_STA_COUNT);
 	cds_free_ol_rx_pkt_freeq(gp_cds_sched_context);
-	qdf_cpuhp_unregister(&gp_cds_sched_context->cpuhp_event_handle);
+	unregister_hotcpu_notifier(&cds_cpu_hotplug_notifier);
+	gp_cds_sched_context->cpu_hot_plug_notifier = NULL;
 #endif
 	gp_cds_sched_context = NULL;
 	return QDF_STATUS_SUCCESS;

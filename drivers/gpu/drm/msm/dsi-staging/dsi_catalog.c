@@ -70,6 +70,7 @@ static void dsi_catalog_cmn_init(struct dsi_ctrl_hw *ctrl,
 	ctrl->ops.wait_for_cmd_mode_mdp_idle =
 		dsi_ctrl_hw_cmn_wait_for_cmd_mode_mdp_idle;
 	ctrl->ops.set_continuous_clk = dsi_ctrl_hw_cmn_set_continuous_clk;
+
 	ctrl->ops.wait4dynamic_refresh_done =
 		dsi_ctrl_hw_cmn_wait4dynamic_refresh_done;
 

@@ -20,7 +20,7 @@ LOCAL_PATH := $(call my-dir)
 ifneq ($(findstring vendor,$(LOCAL_PATH)),)
 
 ifneq ($(findstring opensource,$(LOCAL_PATH)),)
-	WLAN_BLD_DIR := vendor/qcom/opensource/wlan
+	WLAN_BLD_DIR := $(ANDROID_BUILD_TOP)/vendor/qcom/opensource/wlan
 endif # opensource
 
 # DLKM_DIR was moved for JELLY_BEAN (PLATFORM_SDK 16)
@@ -77,11 +77,11 @@ $(shell mkdir -p $(TARGET_OUT)/lib/modules; \
 endif
 endif
 
-ifeq ($(PRODUCT_VENDOR_MOVE_ENABLED),true)
-$(shell ln -sf /persist/wlan_mac.bin $(TARGET_OUT_VENDOR)/firmware/wlan/qca_cld/wlan_mac.bin)
-else
-$(shell ln -sf /persist/wlan_mac.bin $(TARGET_OUT_ETC)/firmware/wlan/qca_cld/wlan_mac.bin)
-endif
+#ifeq ($(PRODUCT_VENDOR_MOVE_ENABLED),true)
+#$(shell ln -sf /persist/wlan_mac.bin $(TARGET_OUT_VENDOR)/firmware/wlan/qca_cld/wlan_mac.bin)
+#else
+#$(shell ln -sf /persist/wlan_mac.bin $(TARGET_OUT_ETC)/firmware/wlan/qca_cld/wlan_mac.bin)
+#endif
 
 endif # DLKM check
 endif # supported target check

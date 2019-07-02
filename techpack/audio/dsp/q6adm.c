@@ -2444,7 +2444,9 @@ int adm_arrange_mch_map(struct adm_cmd_device_open_v5 *open, int path,
 	default:
 		goto non_mch_path;
 	};
-	if ((open->dev_num_channel > 2) && multi_ch_maps[idx].set_channel_map) {
+
+	if ((open->dev_num_channel > 2) && multi_ch_maps[idx].set_channel_map
+		&& (open->endpoint_id_1 != AFE_PORT_ID_SECONDARY_TDM_RX)) {
 		memcpy(open->dev_channel_mapping,
 			multi_ch_maps[idx].channel_mapping,
 			PCM_FORMAT_MAX_NUM_CHANNEL);
@@ -2586,9 +2588,11 @@ int adm_open(int port_id, int path, int rate, int channel_mode, int topology,
 	int copp_idx = -1;
 	int tmp_port = q6audio_get_port_id(port_id);
 
-	pr_debug("%s:port %#x path:%d rate:%d mode:%d perf_mode:%d,topo_id %d\n",
+	pr_info("%s:port %#x path:%d rate:%d mode:%d perf_mode:%d,topo_id %d\n",
 		 __func__, port_id, path, rate, channel_mode, perf_mode,
 		 topology);
+	pr_info("%s:bit_width:%d app_type:%#x acdb_id:%d\n",
+		__func__, bit_width, app_type, acdb_id);
 
 	port_id = q6audio_convert_virtual_to_portid(port_id);
 	port_idx = adm_validate_and_get_port_index(port_id);
@@ -3183,7 +3187,7 @@ int adm_close(int port_id, int perf_mode, int copp_idx)
 	int ret = 0, port_idx;
 	int copp_id = RESET_COPP_ID;
 
-	pr_debug("%s: port_id=0x%x perf_mode: %d copp_idx: %d\n", __func__,
+	pr_info("%s: port_id=0x%x perf_mode: %d copp_idx: %d\n", __func__,
 		 port_id, perf_mode, copp_idx);
 
 	port_id = q6audio_convert_virtual_to_portid(port_id);
