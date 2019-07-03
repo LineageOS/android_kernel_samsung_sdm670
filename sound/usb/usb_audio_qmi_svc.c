@@ -1099,19 +1099,19 @@ static int handle_uaudio_stream_req(void *req_h, void *req)
 
 response:
 	if (!req_msg->enable && (ret != -EINVAL || ret != -ENODEV)) {
+		mutex_lock(&chip->dev_lock);
 		if (info_idx >= 0) {
-			mutex_lock(&chip->dev_lock);
 			info = &uadev[pcm_card_num].info[info_idx];
 			uaudio_dev_intf_cleanup(
 				uadev[pcm_card_num].udev,
 				info);
 			pr_debug("%s:release resources: intf# %d card# %d\n",
 				__func__, subs->interface, pcm_card_num);
-			mutex_unlock(&chip->dev_lock);
 		}
 		if (atomic_read(&uadev[pcm_card_num].in_use))
 			kref_put(&uadev[pcm_card_num].kref,
 					uaudio_dev_release);
+		mutex_unlock(&chip->dev_lock);
 	}
 
 	resp.usb_token = req_msg->usb_token;
