@@ -1,6 +1,7 @@
 ccflags-y := -Iinclude/drm -Idrivers/gpu/drm/msm -Idrivers/gpu/drm/msm/dsi-staging
 ccflags-y += -Idrivers/gpu/drm/msm/sde
 ccflags-y += -Idrivers/gpu/drm/msm/samsung
+ccflags-y += -fno-stack-protector
 
 obj-y += ss_dsi_panel_sysfs.o
 obj-y += ss_dsi_panel_debug.o
