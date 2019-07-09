@@ -179,7 +179,11 @@ extern unsigned sec_debug_get_reset_reason(void);
 extern int sec_debug_get_reset_write_cnt(void);
 extern char *sec_debug_get_reset_reason_str(unsigned int reason);
 extern struct debug_reset_header *get_debug_reset_header(void);
+#ifdef CONFIG_SEC_DEBUG_SUMMARY
 extern void sec_debug_summary_modem_print(void);
+#else
+static inline void sec_debug_summary_modem_print(void) { }
+#endif
 
 static inline void sec_debug_store_pte(unsigned long addr, int idx)
 {
