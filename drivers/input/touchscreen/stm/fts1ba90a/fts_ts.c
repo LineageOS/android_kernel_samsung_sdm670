@@ -1825,9 +1825,9 @@ static u8 fts_event_handler_type_b(struct fts_ts_info *info)
 			if (p_gesture_status->sf == FTS_GESTURE_SAMSUNG_FEATURE) {
 				if ((info->lowpower_flag & FTS_MODE_DOUBLETAP_WAKEUP) &&
 						p_gesture_status->stype == FTS_SPONGE_EVENT_DOUBLETAP) {
-					input_report_key(info->input_dev, KEY_HOMEPAGE, 1);
+					input_report_key(info->input_dev, KEY_WAKEUP, 1);
 					input_sync(info->input_dev);
-					input_report_key(info->input_dev, KEY_HOMEPAGE, 0);
+					input_report_key(info->input_dev, KEY_WAKEUP, 0);
 					input_info(true, &info->client->dev, "%s: Dobule Tap Wake up\n", __func__);
 					break;
 				}
@@ -1836,9 +1836,9 @@ static u8 fts_event_handler_type_b(struct fts_ts_info *info)
 			{
 				if ((info->lowpower_flag & FTS_MODE_DOUBLETAP_WAKEUP) && p_gesture_status->gesture_id == 0x01) {
 					input_info(true, &info->client->dev, "%s: AOT\n", __func__);
-					input_report_key(info->input_dev, KEY_HOMEPAGE, 1);
+					input_report_key(info->input_dev, KEY_WAKEUP, 1);
 					input_sync(info->input_dev);
-					input_report_key(info->input_dev, KEY_HOMEPAGE, 0);
+					input_report_key(info->input_dev, KEY_WAKEUP, 0);
 				}
 			}
 			break;
@@ -2510,7 +2510,7 @@ static void fts_set_input_prop(struct fts_ts_info *info, struct input_dev *dev, 
 	set_bit(BTN_TOUCH, dev->keybit);
 	set_bit(BTN_TOOL_FINGER, dev->keybit);
 	set_bit(KEY_BLACK_UI_GESTURE, dev->keybit);
-	set_bit(KEY_HOMEPAGE, dev->keybit);
+	set_bit(KEY_WAKEUP, dev->keybit);
 
 #ifdef FTS_SUPPORT_TOUCH_KEY
 	if (info->board->support_mskey) {
@@ -3160,7 +3160,7 @@ void fts_release_all_finger(struct fts_ts_info *info)
 	input_report_key(info->input_dev, BTN_TOUCH, 0);
 	input_report_key(info->input_dev, BTN_TOOL_FINGER, 0);
 
-	input_report_key(info->input_dev, KEY_HOMEPAGE, 0);
+	input_report_key(info->input_dev, KEY_WAKEUP, 0);
 
 	if (info->board->support_sidegesture) {
 		input_report_key(info->input_dev, KEY_SIDE_GESTURE, 0);
