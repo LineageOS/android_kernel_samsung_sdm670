@@ -476,6 +476,12 @@ void sec_debug_update_restart_reason(const char *cmd, const int in_panic)
 			PON_RESTART_REASON_UNKNOWN,
 			RESTART_REASON_NORMAL, __pon_restart_swsel },
 #endif
+		{ "adb",
+			PON_RESTART_REASON_NORMALBOOT,
+			RESTART_REASON_NORMAL, NULL },
+		{ "shell",
+			PON_RESTART_REASON_NORMALBOOT,
+			RESTART_REASON_NORMAL, NULL },
 	};
 	enum pon_restart_reason pon_rr = (!in_panic) ?
 				PON_RESTART_REASON_NORMALBOOT :
