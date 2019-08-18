@@ -15,6 +15,10 @@
 #include <linux/usb/manager/usb_typec_manager_notifier.h>
 #endif
 
+#ifdef CONFIG_DRM
+#include <linux/notifier.h>
+#endif
+
 #undef FTS_SUPPORT_TOUCH_KEY
 #define FTS_SUPPORT_SPONGELIB
 #define USE_OPEN_CLOSE
@@ -761,6 +765,10 @@ struct fts_ts_info {
 	int rawcap_min;
 	int rawcap_min_tx;
 	int rawcap_min_rx;
+
+#if defined(CONFIG_DRM)
+	struct notifier_block dsi_panel_notif;
+#endif
 
 	int (*stop_device)(struct fts_ts_info *info, bool lpmode);
 	int (*start_device)(struct fts_ts_info *info);
