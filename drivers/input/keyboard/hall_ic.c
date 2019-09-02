@@ -45,12 +45,12 @@ struct hall_drvdata {
 	struct wake_lock flip_wake_lock;
 };
 
-static bool flip_cover = 1;
+bool sec_flip_cover = 1;
 
 static ssize_t hall_detect_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
-	if (flip_cover)
+	if (sec_flip_cover)
 		sprintf(buf, "CLOSE\n");
 	else
 		sprintf(buf, "OPEN\n");
@@ -78,8 +78,8 @@ static void flip_cover_work(struct work_struct *work)
 	pr_info("keys:%s #2 : %d\n", __func__, second);
 
 	if (first == second) {
-		flip_cover = first;
-		input_report_switch(ddata->input, SW_FLIP, flip_cover);
+		sec_flip_cover = first;
+		input_report_switch(ddata->input, SW_FLIP, sec_flip_cover);
 		input_sync(ddata->input);
 	}
 }
@@ -97,7 +97,7 @@ static void flip_cover_work(struct work_struct *work)
 
 	pr_info("keys:%s #1 : %d\n", __func__, first);
 
-	flip_cover = first;
+	sec_flip_cover = first;
 	input_report_switch(ddata->input,
 			SW_FLIP, ddata->flip_cover);
 	input_sync(ddata->input);
@@ -114,7 +114,7 @@ static void flip_cover_work(struct work_struct *work)
 					SW_FLIP, ddata->emulated_hall_ic_status);
 			input_sync(ddata->input);
 		}
-		flip_cover = first;
+		sec_flip_cover = first;
 	}
 	schedule_delayed_work(&ddata->flip_cover_dwork, msecs_to_jiffies(1000));
 #endif
@@ -183,9 +183,9 @@ static void init_hall_ic_irq(struct input_dev *input)
 	int irq = ddata->irq_flip_cover;
 
 #if !defined(EMULATE_HALL_IC)
-	flip_cover = !gpio_get_value(ddata->gpio_flip_cover);
+	sec_flip_cover = !gpio_get_value(ddata->gpio_flip_cover);
 #else
-	flip_cover = 0;
+	sec_flip_cover = 0;
 #endif
 
 	INIT_DELAYED_WORK(&ddata->flip_cover_dwork, flip_cover_work);
