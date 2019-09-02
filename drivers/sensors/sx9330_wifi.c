@@ -56,12 +56,6 @@
 				| MSK_IRQSTAT_RELEASE   \
 				| MSK_IRQSTAT_COMP)
 
-#if defined(CONFIG_FOLDER_HALL)
-#define HALLIC_PATH		"/sys/class/sec/sec_flip/flipStatus"
-#else
-#define HALLIC_PATH		"/sys/class/sec/hall_ic/hall_detect"
-#endif
-
 struct sx9330_p {
 	struct i2c_client *client;
 	struct input_dev *input;
@@ -104,7 +98,6 @@ struct sx9330_p {
 	s32 max_normal_diff;
 
 	int debug_count;
-	char hall_ic[6];
 
 #ifdef CONFIG_SENSORS_SX9330_WIFI_2CH
 	int state_ch2;
@@ -121,41 +114,7 @@ struct sx9330_p {
 #endif
 };
 
-static int sx9330_check_hallic_state(char *file_path, char hall_ic_status[])
-{
-	int iRet = 0;
-	mm_segment_t old_fs;
-	struct file *filep;
-	char hall_sysfs[5];
-
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-
-	filep = filp_open(file_path, O_RDONLY, 0440);
-	if (IS_ERR(filep)) {
-		iRet = PTR_ERR(filep);
-		pr_err("[SX9330_WIFI]: %s - file open fail %d\n", __func__, iRet);
-		set_fs(old_fs);
-		return iRet;
-	}
-
-	iRet = filep->f_op->read(filep, hall_sysfs,
-		sizeof(hall_sysfs), &filep->f_pos);
-
-	if (iRet <= 0) {
-		pr_err("[SX9330_WIFI]: %s - file read fail %d\n", __func__, iRet);
-		filp_close(filep, current->files);
-		set_fs(old_fs);
-		return -EIO;
-	} else {
-		strncpy(hall_ic_status, hall_sysfs, sizeof(hall_sysfs));
-	}
-
-	filp_close(filep, current->files);
-	set_fs(old_fs);
-
-	return iRet;
-}
+extern bool sec_flip_cover;
 
 static int sx9330_get_nirq_state(struct sx9330_p *data)
 {
@@ -1472,17 +1431,7 @@ static void sx9330_debug_work_func(struct work_struct *work)
 		struct sx9330_p, debug_work);
 	static int hall_flag = 1;
 
-#if defined(CONFIG_FOLDER_HALL)
-	char str[2] = "0";
-#else
-	char str[6] = "CLOSE";
-#endif
-
-	sx9330_check_hallic_state(HALLIC_PATH, data->hall_ic);
-
-	data->hall_ic[sizeof(str)-1] = '\0';
-
-	if (strcmp(data->hall_ic, str) == 0) {
+	if (!sec_flip_cover) {
 		if (hall_flag) {
 			pr_info("[SX9330_WIFI]: %s - hall IC is closed\n", __func__);
 			sx9330_set_offset_calibration(data);
