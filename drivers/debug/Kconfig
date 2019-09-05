@@ -239,13 +239,11 @@ choice
 
 	config SEC_DEBUG_GAF_V4
 		bool "Use GAF structure version 4"
-		default n
 		help
 		  Default option for FIVE-enabled kernel
 
 	config SEC_DEBUG_GAF_V5
 		bool "Use GAF structure version 5"
-		default n
 		help
 		  Default option for kernel with PROCA LSM module.
 
