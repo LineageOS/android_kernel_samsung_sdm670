@@ -687,7 +687,7 @@ static void dp_ctrl_calc_tu_parameters(struct dp_ctrl_private *ctrl,
 	if (h_blank < (u32)min_hblank) {
 		pr_debug(" WARNING: run_idx=%d Programmed h_blank %d is smaller than the min_hblank %d supported.\n",
 					run_idx, h_blank, min_hblank);
-#ifdef CONFIG_SEC_DISPLAYPORT
+#if 0/*def CONFIG_SEC_DISPLAYPORT*/
 		ctrl->link_train_status = false;
 #endif
 	}

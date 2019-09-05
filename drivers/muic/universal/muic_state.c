@@ -249,9 +249,6 @@ static void muic_handle_attach(muic_data_t *pmuic,
 	noti_f = true;
 	switch (new_dev) {
 	case ATTACHED_DEV_USB_MUIC:
-		pr_info("%s:%s attach_usb => call muic_GPIO_control(1) \n",
-					__func__, MUIC_DEV_NAME);
-		muic_GPIO_control(1);
 	case ATTACHED_DEV_CDP_MUIC:
 	case ATTACHED_DEV_TIMEOUT_OPEN_MUIC:
 		ret = attach_usb(pmuic, new_dev);
@@ -277,7 +274,8 @@ static void muic_handle_attach(muic_data_t *pmuic,
 			pr_info("%s:%s AFC Disable(%d) by WATER!\n", MUIC_DEV_NAME,
 				    __func__, pmuic->afc_water_disable);
 #endif
-		muic_afc_delay_check_state(1);
+		if (!pmuic->pdata->afc_disable)
+			muic_afc_delay_check_state(1);
 #endif
         
 #ifdef CONFIG_MUIC_SM5705_AFC_18W_TA_SUPPORT
@@ -523,12 +521,6 @@ void muic_detect_dev(muic_data_t *pmuic)
 		pmuic->vps.s.val3, pmuic->vps.s.adc, pmuic->vps.s.vbvolt);
 	pr_info("%s:%s intr[1:0x%x, 2:0x%x, 3:0x%x]\n", pmuic->chip_name, __func__,
 			pmuic->intr.intr1, pmuic->intr.intr2, pmuic->intr.intr3);
-
-	if (pmuic->vps.s.vbvolt && pmuic->intr.intr2 & MUIC_INTR_VBUS_ON) {
-		pr_info("%s:%s vbus intr + vbolt case => call muic_GPIO_control(0)\n", 
-			pmuic->chip_name, __func__);
-		muic_GPIO_control(0);
-	}
 
 	if (vps_resolve_dev(pmuic, &new_dev, &intr) < 0) {
 		pr_info("%s:%s: discarded.\n",MUIC_DEV_NAME,__func__);

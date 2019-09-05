@@ -376,7 +376,15 @@ int pogo_fpga_config(struct pogo_fpga *pogo_fpga,char *bitstream)
 		release_firmware(fw);
 		udelay (1000);	/* Wait for min 1000 microsec to clear internal configuration memory  */
 
-		gpio_set_value (pogo_fpga->pdata->fpga_gpio_reset, 0);
+		gpio_set_value (pogo_fpga->pdata->fpga_gpio_reset, GPIO_LEVEL_LOW);
+		pr_info("[FPGA],%s : reset %d\n", __func__,  gpio_get_value (pogo_fpga->pdata->fpga_gpio_reset));
+
+		gpio_set_value (pogo_fpga->pdata->fpga_gpio_reset, GPIO_LEVEL_HIGH);
+		pr_info("[FPGA],%s : reset %d\n", __func__,  gpio_get_value (pogo_fpga->pdata->fpga_gpio_reset));
+
+		mdelay(10);
+
+		gpio_set_value (pogo_fpga->pdata->fpga_gpio_reset, GPIO_LEVEL_LOW);
 		pr_info("[FPGA],%s : reset %d\n", __func__,  gpio_get_value (pogo_fpga->pdata->fpga_gpio_reset));
 	}
 
@@ -655,11 +663,14 @@ static int pogo_fpga_resume(struct device *dev)
 {
 	struct pogo_fpga *pogo_fpga = dev_get_drvdata(dev);
 	uint8_t fpga_resume[5] = {0x38, 0x00, 0xff, 0xff, 0x01};
+	int ret;
 
 	pr_info("[FPGA],%s\n", __func__);
 
-	pogo_fpga_tx_data(pogo_fpga, fpga_resume, sizeof(fpga_resume));
-	
+	ret = pogo_fpga_tx_data(pogo_fpga, fpga_resume, sizeof(fpga_resume));
+	if (ret) {
+		pr_info("[FPGA],%s resume state: %d\n", __func__, ret);
+	}
 	return 0;
 }
 
@@ -667,11 +678,16 @@ static int pogo_fpga_suspend(struct device *dev)
 {
 	struct pogo_fpga *pogo_fpga = dev_get_drvdata(dev);
 	uint8_t fpga_suspend[5] = {0x38, 0x00, 0xff, 0xff, 0x00};
+	int ret;
 
 	pr_info("[FPGA],%s\n", __func__);
 	
-	pogo_fpga_tx_data(pogo_fpga, fpga_suspend, sizeof(fpga_suspend));
-
+	ret = pogo_fpga_tx_data(pogo_fpga, fpga_suspend, sizeof(fpga_suspend));
+	if (ret) {
+		pr_info("[FPGA],%s suspend state: %d\n", __func__, ret);
+	}
+	
+	gpio_set_value(g_pogo_fpga->pdata->fpga_gpio_reset, GPIO_LEVEL_LOW);
 	return 0;
 }
 

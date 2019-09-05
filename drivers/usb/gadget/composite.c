@@ -612,7 +612,8 @@ static int config_buf(struct usb_configuration *config,
 	c->iConfiguration = config->iConfiguration;
 	c->bmAttributes = USB_CONFIG_ATT_ONE | config->bmAttributes;
 	c->bMaxPower = encode_bMaxPower(speed, config);
-	if (config->cdev->gadget->self_powered) {
+	if (config->cdev->gadget->is_selfpowered) {
+		pr_info("usb: %s is_selfpowered\n", __func__);
 		c->bmAttributes |= USB_CONFIG_ATT_SELFPOWER;
 		c->bMaxPower = 0;
 	}

@@ -7,14 +7,16 @@ SEC_GTS4LV_EUR_DTBO := \
 		sdm670-sec-gts4lv-eur-overlay-r02.dtbo \
 		sdm670-sec-gts4lv-eur-overlay-r03.dtbo \
 		sdm670-sec-gts4lv-eur-overlay-r04.dtbo \
-		sdm670-sec-gts4lv-eur-overlay-r05.dtbo
+		sdm670-sec-gts4lv-eur-overlay-r05.dtbo \
+		sdm670-sec-gts4lv-eur-overlay-r06.dtbo
 		
 # GTS4LV WIFI
 SEC_GTS4LVWIFI_EUR_DTBO := \
 		sdm670-sec-gts4lvwifi-eur-overlay-r02.dtbo \
 		sdm670-sec-gts4lvwifi-eur-overlay-r03.dtbo \
 		sdm670-sec-gts4lvwifi-eur-overlay-r04.dtbo \
-		sdm670-sec-gts4lvwifi-eur-overlay-r05.dtbo
+		sdm670-sec-gts4lvwifi-eur-overlay-r05.dtbo \
+		sdm670-sec-gts4lvwifi-eur-overlay-r06.dtbo
 		
 # GTS4LV KOR
 SEC_GTS4LV_KOR_DTBO := \
@@ -33,7 +35,11 @@ SEC_GTS4LV_MEA_DTBO := \
 
 # GTS4LV USA
 SEC_GTS4LV_USA_DTBO := \
-		sdm670-sec-gts4lv-usa-overlay-r04.dtbo
+		sdm670-sec-gts4lv-usa-overlay-r04.dtbo \
+		sdm670-sec-gts4lv-usa-overlay-r05.dtbo \
+		sdm670-sec-gts4lv-usa-overlay-r06.dtbo \
+		sdm670-sec-gts4lv-usa-overlay-r07.dtbo \
+		sdm670-sec-gts4lv-usa-overlay-r08.dtbo
 
 define __sec_dtbo_build
 dtbo-$(2) += $(1)

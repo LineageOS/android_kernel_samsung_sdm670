@@ -201,22 +201,16 @@ static enum power_supply_property sec_battery_props[] = {
 
 static enum power_supply_property sec_power_props[] = {
 	POWER_SUPPLY_PROP_ONLINE,
-	POWER_SUPPLY_PROP_VOLTAGE_MAX,
-	POWER_SUPPLY_PROP_CURRENT_MAX,
 };
 
 static enum power_supply_property sec_wireless_props[] = {
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_PRESENT,
-	POWER_SUPPLY_PROP_VOLTAGE_MAX,
-	POWER_SUPPLY_PROP_CURRENT_MAX,
 };
 
 static enum power_supply_property sec_ac_props[] = {
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_TEMP,
-	POWER_SUPPLY_PROP_VOLTAGE_MAX,
-	POWER_SUPPLY_PROP_CURRENT_MAX,
 };
 
 static enum power_supply_property sec_ps_props[] = {
@@ -6546,7 +6540,7 @@ static int sec_bat_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CHARGE_TYPE:
 		if (is_nocharge_type(battery->cable_type)) {
 			val->intval = POWER_SUPPLY_CHARGE_TYPE_NONE;
-		} else if (is_hv_wire_type(battery->cable_type)) {
+		} else if (is_hv_wire_type(battery->cable_type) || is_pd_wire_type(battery->cable_type)) {
 			val->intval = POWER_SUPPLY_CHARGE_TYPE_FAST;
 		} else {
 			psy_do_property(battery->pdata->charger_name, get,
@@ -6711,20 +6705,8 @@ static int sec_usb_get_property(struct power_supply *psy,
 {
 	struct sec_battery_info *battery = power_supply_get_drvdata(psy);
 
-	switch (psp) {
-	case POWER_SUPPLY_PROP_ONLINE:
-		break;
-	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
-		/* V -> uV */
-		val->intval = battery->input_voltage * 1000000;
-		return 0;
-	case POWER_SUPPLY_PROP_CURRENT_MAX:
-		/* mA -> uA */
-		val->intval = battery->pdata->charging_current[battery->cable_type].input_current_limit * 1000;
-		return 0;
-	default:
+	if (psp != POWER_SUPPLY_PROP_ONLINE)
 		return -EINVAL;
-	}
 
 	if ((battery->health == POWER_SUPPLY_HEALTH_OVERVOLTAGE) ||
 		(battery->health == POWER_SUPPLY_HEALTH_UNDERVOLTAGE)) {
@@ -6800,14 +6782,6 @@ static int sec_ac_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_TEMP:
 		val->intval = battery->chg_temp;
 		break;
-	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
-		/* V -> uV */
-		val->intval = battery->input_voltage * 1000000;
-		return 0;
-	case POWER_SUPPLY_PROP_CURRENT_MAX:
-		/* mA -> uA */
-		val->intval = battery->pdata->charging_current[battery->cable_type].input_current_limit * 1000;
-		return 0;
 	default:
 		return -EINVAL;
 	}
@@ -6834,14 +6808,6 @@ static int sec_wireless_get_property(struct power_supply *psy,
 		val->intval = (battery->pdata->wireless_charger_name) ?
 			1 : 0;
 		break;
-	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
-		/* V -> uV */
-		val->intval = battery->input_voltage * 1000000;
-		return 0;
-	case POWER_SUPPLY_PROP_CURRENT_MAX:
-		/* mA -> uA */
-		val->intval = battery->pdata->charging_current[battery->cable_type].input_current_limit * 1000;
-		return 0;
 	default:
 		return -EINVAL;
 	}
@@ -7187,7 +7153,10 @@ static int sec_bat_get_pd_list_index(PDIC_SINK_STATUS *sink_status, struct sec_b
 
 static void sec_bat_set_rp_current(struct sec_battery_info *battery, int cable_type)
 {
-	if (battery->pdic_info.sink_status.rp_currentlvl == RP_CURRENT_LEVEL3) {
+	if (battery->pdic_info.sink_status.rp_currentlvl == RP_CURRENT_ABNORMAL) {
+		sec_bat_change_default_current(battery, cable_type,
+					RP_CURRENT_ABNORMAL_RP3, RP_CURRENT_ABNORMAL_RP3);
+	} else if (battery->pdic_info.sink_status.rp_currentlvl == RP_CURRENT_LEVEL3) {
 		if (battery->current_event & SEC_BAT_CURRENT_EVENT_HV_DISABLE)
 			sec_bat_change_default_current(battery, cable_type,
 				battery->pdata->default_input_current, battery->pdata->default_charging_current);

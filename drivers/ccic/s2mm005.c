@@ -820,7 +820,9 @@ static int s2mm005_usbpd_probe(struct i2c_client *i2c,
 	u8 check[8] = {0,};
 	uint16_t REG_ADD;
 	uint8_t MSG_BUF[32] = {0,};
-	SINK_VAR_SUPPLY_Typedef *pSINK_MSG;
+#if defined(CONFIG_SEC_GTS4LV_PROJECT)
+	SINK_VAR_SUPPLY_Typedef *pSINK_VAR_MSG;
+#endif
 	MSG_HEADER_Typedef *pMSG_HEADER;
 #if defined(CONFIG_SEC_FACTORY)
 	LP_STATE_Type Lp_DATA;
@@ -884,6 +886,7 @@ static int s2mm005_usbpd_probe(struct i2c_client *i2c,
 	usbpd_data->water_det = 0;
 	usbpd_data->run_dry = 1;
 	usbpd_data->booting_run_dry = 1;
+        usbpd_data->short_detected = false;
 #if defined(CONFIG_DUAL_ROLE_USB_INTF)
 	usbpd_data->try_state_change = 0;
 #endif
@@ -1034,16 +1037,21 @@ static int s2mm005_usbpd_probe(struct i2c_client *i2c,
 	}
 
 	pMSG_HEADER = (MSG_HEADER_Typedef *)&MSG_BUF[0];
-	pMSG_HEADER->BITS.Number_of_obj += 1;
-	pSINK_MSG = (SINK_VAR_SUPPLY_Typedef *)&MSG_BUF[8];
-	pSINK_MSG->DATA = 0x8F019032; // 5V~12V, 500mA
+#if defined(CONFIG_SEC_GTS4LV_PROJECT)
+	pMSG_HEADER->BITS.Number_of_obj -= 1;
+	pSINK_VAR_MSG = (SINK_VAR_SUPPLY_Typedef *)&MSG_BUF[12];
+	pSINK_VAR_MSG->DATA = 0x8B4190C8; /* 5~9V, 2A */
+#endif
 
 	dev_info(&i2c->dev, "--- Write DATA\n\r");
 	for (cnt = 0; cnt < 8; cnt++) {
 		dev_info(&i2c->dev, "   0x%08X\n\r", MSG_DATA[cnt]);
 	}
 
+	/* default value is written by CCIC FW. If you need others, overwrite it.*/
+#if defined(CONFIG_SEC_GTS4LV_PROJECT)
 	s2mm005_write_byte(i2c, REG_ADD, &MSG_BUF[0], 32);
+#endif
 
 	for (cnt = 0; cnt < 32; cnt++) {
 		MSG_BUF[cnt] = 0;
@@ -1131,7 +1139,7 @@ static int s2mm005_usbpd_probe(struct i2c_client *i2c,
 	usbpd_data->Vendor_ID = 0;
 	usbpd_data->Product_ID = 0;
 	usbpd_data->Device_Version = 0;
-	usbpd_data->host_turn_on_wait_time = 3;
+	usbpd_data->host_turn_on_wait_time = 20;
 	usbpd_data->is_sent_pin_configuration = 0;
 	ccic_register_switch_device(1);
 	INIT_DELAYED_WORK(&usbpd_data->acc_detach_work, acc_detach_check);
