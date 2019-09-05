@@ -139,12 +139,7 @@ extern void sec_gaf_supply_rqinfo(unsigned short curr_offset,
 				  unsigned short rq_offset);
 extern bool sec_debug_is_enabled(void);
 extern unsigned int sec_debug_level(void);
-#ifdef CONFIG_SEC_DEBUG_SUMMARY
 extern int sec_debug_is_modem_separate_debug_ssr(void);
-#else
-static inline int sec_debug_is_modem_separate_debug_ssr(void)
-			{ return SEC_DEBUG_MODEM_SEPARATE_DIS; }
-#endif
 extern int silent_log_panic_handler(void);
 extern void sec_debug_print_model(struct seq_file *m, const char *cpu_name);
 
@@ -265,6 +260,16 @@ struct tsp_dump_callbacks {
 };
 #endif
 
+#ifdef CONFIG_SEC_DEBUG_PWDT
+#define SEC_DEBUG_MAX_PWDT_RESTART_CNT 20	//200 seconds
+#define SEC_DEBUG_MAX_PWDT_SYNC_CNT 40	//400 seconds
+#define SEC_DEBUG_MAX_PWDT_INIT_CNT 200	//2000 seconds
+extern void sec_debug_check_pwdt(void);
+extern unsigned int is_verifiedboot_state(void);
+#endif
+
+extern unsigned int is_boot_recovery(void);
+extern unsigned int is_boot_lpm(void);
 extern int set_reduced_sdi_mode(void);
 
 #endif	/* SEC_DEBUG_H */

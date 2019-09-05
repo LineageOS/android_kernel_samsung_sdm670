@@ -7462,6 +7462,73 @@ static int drv_cmd_get_disable_chan_list(hdd_adapter_t *adapter,
 
 int sec_sar_index = 0;
 
+#ifdef SEC_CONFIG_WLAN_BEACON_CHECK
+int hdd_set_bmiss_count_check(hdd_adapter_t *adapter,
+			      hdd_context_t *hdd_ctx, bool enable) {
+	uint8_t ret_val;
+
+	if(enable) {
+		// set bmiss first / final to 30
+		// set kickout coun to 2048
+		hdd_err("hdd_set_bmiss_count_check enabled");
+		hdd_debug("Bmiss first cnt(10), Bmiss final cnt(50)");
+		ret_val = sme_set_roam_bmiss_final_bcnt(hdd_ctx->hHal,
+			0, 50);
+
+
+		if (ret_val) {
+			hdd_err("Failed to set bmiss final Bcnt");
+			return ret_val;
+		}
+
+		ret_val = sme_set_bmiss_bcnt(adapter->sessionId, 10, 50);
+		if (ret_val) {
+			hdd_err("Failed to set bmiss Bcnt");
+			return ret_val;
+		} 
+
+		hdd_debug("tx fail count 2048");
+		ret_val = sme_update_tx_fail_cnt_threshold(hdd_ctx->hHal,
+							   adapter->sessionId, 2048);
+		if (ret_val) {
+			hdd_err("Failed to set kickout count");
+			return ret_val;
+		}
+	} else {
+		// set to default value.
+		hdd_err("hdd_set_bmiss_count_check default");
+		hdd_debug("Bmiss first cnt(%d), Bmiss final cnt(%d)",
+			hdd_ctx->config->nRoamBmissFirstBcnt,
+			hdd_ctx->config->nRoamBmissFinalBcnt);
+		ret_val = sme_set_roam_bmiss_final_bcnt(hdd_ctx->hHal,
+			0, hdd_ctx->config->nRoamBmissFinalBcnt);
+		if (ret_val) {
+			hdd_err("Failed to set bmiss final Bcnt");
+			return ret_val;
+		}
+
+		ret_val = sme_set_bmiss_bcnt(adapter->sessionId,
+			hdd_ctx->config->nRoamBmissFirstBcnt,
+			hdd_ctx->config->nRoamBmissFinalBcnt);
+		if (ret_val) {
+			hdd_err("Failed to set bmiss Bcnt");
+			return ret_val;
+		}
+
+		hdd_debug("tx fail count to %d",
+			  hdd_ctx->config->pkt_err_disconn_th);
+		ret_val = sme_update_tx_fail_cnt_threshold(hdd_ctx->hHal,
+				   adapter->sessionId,
+				   hdd_ctx->config->pkt_err_disconn_th);
+		if (ret_val) {
+			hdd_err("Failed to set kickout count");
+			return ret_val;
+		}
+	}
+	return ret_val;
+}
+#endif
+
 int hdd_set_sar_power_limit(hdd_context_t *hdd_ctx, uint8_t index, bool enable)
 {
 	int status = 0;
@@ -7513,10 +7580,18 @@ static int drv_cmd_grip_power_set_tx_power_calling(hdd_adapter_t *adapter,
 
 	/* convert the value from ascii to integer */
 	set_value = command[WLAN_HDD_UI_SET_GRIP_TX_PWR_VALUE_OFFSET] - '0';
-	if (!set_value)
+	if (!set_value) {
 		hdd_set_sar_power_limit(hdd_ctx, SAR_POWER_LIMIT_FOR_GRIP_SENSOR, 1);
-	else
+#ifdef SEC_CONFIG_WLAN_BEACON_CHECK
+		hdd_set_bmiss_count_check(adapter, hdd_ctx, TRUE);
+#endif
+	}
+	else {
 		hdd_set_sar_power_limit(hdd_ctx, SAR_POWER_LIMIT_FOR_GRIP_SENSOR, 0);
+#ifdef SEC_CONFIG_WLAN_BEACON_CHECK
+		hdd_set_bmiss_count_check(adapter, hdd_ctx, FALSE);
+#endif
+	}
 
 	return status;
 }

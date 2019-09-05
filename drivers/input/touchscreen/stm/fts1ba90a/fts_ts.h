@@ -15,10 +15,6 @@
 #include <linux/usb/manager/usb_typec_manager_notifier.h>
 #endif
 
-#ifdef CONFIG_DRM
-#include <linux/notifier.h>
-#endif
-
 #undef FTS_SUPPORT_TOUCH_KEY
 #define FTS_SUPPORT_SPONGELIB
 #define USE_OPEN_CLOSE
@@ -278,9 +274,10 @@ struct fts_sponge_information {
 } __packed;
 
 #define FTS_CMD_EDGE_HANDLER		0x00
-#define FTS_CMD_EDGE_AREA		0x01
-#define FTS_CMD_DEAD_ZONE		0x02
-#define FTS_CMD_LANDSCAPE_MODE		0x03
+#define FTS_CMD_EDGE_AREA		0x07
+#define FTS_CMD_DEAD_ZONE		0x08
+#define FTS_CMD_LANDSCAPE_MODE		0x09
+#define FTS_CMD_LANDSCAPE_TOP_BOTTOM	0x0A
 
 enum grip_write_mode {
 	G_NONE				= 0,
@@ -735,6 +732,8 @@ struct fts_ts_info {
 	u16 grip_landscape_deadzone;
 	u16 grip_landscape_top_deadzone;
 	u16 grip_landscape_bottom_deadzone;
+	u16 grip_landscape_top_gripzone;
+	u16 grip_landscape_bottom_gripzone;
 
 	u16 rect_data[4];
 	u8 ito_test[4];
@@ -762,10 +761,6 @@ struct fts_ts_info {
 	int rawcap_min;
 	int rawcap_min_tx;
 	int rawcap_min_rx;
-
-#if defined(CONFIG_DRM)
-	struct notifier_block dsi_panel_notif;
-#endif
 
 	int (*stop_device)(struct fts_ts_info *info, bool lpmode);
 	int (*start_device)(struct fts_ts_info *info);

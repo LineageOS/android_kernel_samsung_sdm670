@@ -547,6 +547,8 @@ static int chgtype_sm_to_maxim(int chgtyp)
 	switch (chgtyp) {
 	case 0x01: // DCP
 	case 0x10: // U200
+	case 0x11: // AFC
+	case 0x13: // QC2.0
 		ret = CHGTYP_DEDICATED_CHARGER;
 		break;
 	case 0x02: // CDP
