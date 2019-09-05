@@ -3061,6 +3061,28 @@ static int dwc3_msm_get_clk_gdsc(struct dwc3_msm *mdwc)
 	return 0;
 }
 
+void dwc3_set_selfpowered(u8 enabled)
+{
+	struct dwc3_msm *mdwc;
+	struct dwc3 *dwc;
+
+	if (!msm_dwc3)
+		return;
+	mdwc = dev_get_drvdata(msm_dwc3);
+
+	if (!mdwc->dwc3)
+		return;
+	dwc = platform_get_drvdata(mdwc->dwc3);
+
+	if (!(&dwc->gadget))
+		return;		
+	if (enabled)
+		usb_gadget_set_selfpowered(&dwc->gadget);
+	else
+		usb_gadget_clear_selfpowered(&dwc->gadget);
+}
+EXPORT_SYMBOL(dwc3_set_selfpowered);
+
 void dwc3_max_speed_setting(int speed)
 {
 	// speed 0 , it means Super speed

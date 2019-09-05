@@ -16,15 +16,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* START_OF_KNOX_NPA */
+// KNOX NPA - START
 
 #ifndef NCM_COMMON_H__
 #define NCM_COMMON_H__
 
-/* Address length consistent with com_android_server_enterprise_nap_NetworkAnalyticsDriver.cpp */
-#define INET6_ADDRSTRLEN_NAP 48
-
-#define NCM_VERSION 10
+#define NCM_VERSION 11
 
 #define INIT_UID_NAP 0
 #define INIT_PID_NAP 1
@@ -33,17 +30,22 @@
 
 #define IPV4_FAMILY_NAP 2
 #define IPV6_FAMILY_NAP 10
+#define INET6_ADDRSTRLEN_NAP 48
 
 #define NCM_FLOW_TYPE_DEFAULT -1
 #define NCM_FLOW_TYPE_ALL 0
 #define NCM_FLOW_TYPE_OPEN 1
 #define NCM_FLOW_TYPE_CLOSE 2
+#define NCM_FLOW_TYPE_INTERMEDIATE 3
 
 #include <linux/kernel.h>
 #include <linux/inet.h>
 #include <linux/sched.h>
 #include <linux/string.h>
 #include <net/netfilter/nf_conntrack.h>
+
+#define isIpv4AddressEqualsNull(srcaddr, dstaddr) ((((strcmp(srcaddr, "0.0.0.0")) || (strcmp(dstaddr, "0.0.0.0"))) == 0) ? 1 : 0)
+#define isIpv6AddressEqualsNull(srcaddr, dstaddr) ((((strcmp(srcaddr, "0000:0000:0000:0000:0000:0000:0000:0000")) || (strcmp(dstaddr, "0000:0000:0000:0000:0000:0000:0000:0000"))) == 0) ? 1 : 0)
 
 /* Struct Socket definition */
 struct knox_socket_metadata {
@@ -137,6 +139,8 @@ extern void knox_collect_conntrack_data(struct nf_conn *ct, int startStop, int w
 
 extern bool kfifo_status(void);
 extern void insert_data_kfifo_kthread(struct knox_socket_metadata* knox_socket_metadata);
+extern unsigned int check_intermediate_flag(void);
+extern unsigned int get_intermediate_timeout(void);
 
 /* Debug */
 #define NCM_DEBUG        1
@@ -160,4 +164,4 @@ extern void insert_data_kfifo_kthread(struct knox_socket_metadata* knox_socket_m
 
 #endif
 
-/* END_OF_KNOX_NPA */
+// KNOX NPA - END

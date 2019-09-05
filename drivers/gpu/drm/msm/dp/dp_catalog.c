@@ -58,7 +58,7 @@
 
 #ifdef SECDP_CALIBRATE_VXPX
 /* table for calibraton - DO NOT USE IN MARKET BINARY, sdm845 P-OS default */
-static u8 const vm_pre_emphasis[4][4] = {
+static u8 vm_pre_emphasis[4][4] = {
 	{0x00, 0x0B, 0x14, 0xFF},       /* pe0, 0 db */
 	{0x00, 0x0B, 0x12, 0xFF},       /* pe1, 3.5 db */
 	{0x00, 0x0B, 0xFF, 0xFF},       /* pe2, 6.0 db */
@@ -66,7 +66,7 @@ static u8 const vm_pre_emphasis[4][4] = {
 };
 
 /* voltage swing, 0.2v and 1.0v are not support */
-static u8 const vm_voltage_swing[4][4] = {
+static u8 vm_voltage_swing[4][4] = {
 	{0x07, 0x0F, 0x16, 0xFF}, /* sw0, 0.4v  */
 	{0x11, 0x1E, 0x1F, 0xFF}, /* sw1, 0.6 v */
 	{0x19, 0x1F, 0xFF, 0xFF}, /* sw1, 0.8 v */
@@ -87,6 +87,21 @@ static u8 const vm_voltage_swing[4][4] = {
 	{0x11, 0x1D, 0x1F, 0xFF}, /* sw1, 0.6 v */
 	{0x18, 0x1F, 0xFF, 0xFF}, /* sw1, 0.8 v */
 	{0xFF, 0xFF, 0xFF, 0xFF}  /* sw1, 1.2 v, optional */
+};
+
+/* re-calibration for new FPCB. it's applied since hwid 05 */
+static u8 const vm_pre_emphasis5[4][4] = {
+	{0x0A, 0x0A, 0x0A, 0xFF},       /* pe0, 0 db */
+	{0x0A, 0x0A, 0x0A, 0xFF},       /* pe1, 3.5 db */
+	{0x0A, 0x0A, 0xFF, 0xFF},       /* pe2, 6.0 db */
+	{0xFF, 0xFF, 0xFF, 0xFF}        /* pe3, 9.5 db */
+};
+
+static u8 const vm_voltage_swing5[4][4] = {
+	{0x1D, 0x1D, 0x1D, 0xFF},       /* sw0, 0.4v  */
+	{0x1D, 0x1D, 0x1D, 0xFF},       /* sw1, 0.6 v */
+	{0x1D, 0x1D, 0xFF, 0xFF},       /* sw1, 0.8 v */
+	{0xFF, 0xFF, 0xFF, 0xFF}        /* sw1, 1.2 v, optional */
 };
 #endif
 
@@ -1198,8 +1213,19 @@ static void dp_catalog_ctrl_update_vx_px(struct dp_catalog_ctrl *ctrl,
 
 	pr_debug("hw: v=%d p=%d\n", v_level, p_level);
 
+#ifndef CONFIG_SEC_DISPLAYPORT
 	value0 = vm_voltage_swing[v_level][p_level];
 	value1 = vm_pre_emphasis[v_level][p_level];
+#else
+	pr_debug("rev_hw: %u\n", catalog->parser->rev_hw);
+	if (catalog->parser->rev_hw < 5) {
+		value0 = vm_voltage_swing[v_level][p_level];
+		value1 = vm_pre_emphasis[v_level][p_level];
+	} else {
+		value0 = vm_voltage_swing5[v_level][p_level];
+		value1 = vm_pre_emphasis5[v_level][p_level];
+	}
+#endif
 
 	/* program default setting first */
 

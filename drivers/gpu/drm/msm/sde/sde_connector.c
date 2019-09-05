@@ -1826,7 +1826,11 @@ int sde_connector_esd_status(struct drm_connector *conn)
 
 	/* protect this call with ESD status check call */
 	mutex_lock(&sde_conn->lock);
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+	ret = sde_conn->ops.check_status(sde_conn->display, false);
+#else
 	ret = sde_conn->ops.check_status(sde_conn->display, true);
+#endif
 	mutex_unlock(&sde_conn->lock);
 
 	if (ret <= 0) {

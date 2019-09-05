@@ -1298,6 +1298,37 @@ void secdp_clear_link_status_update_cnt(struct dp_link *dp_link)
 	dp_link->status_update_cnt = 0;
 }
 
+void secdp_reset_link_status(struct dp_link *dp_link)
+{
+	struct dp_link_private *link;
+
+	if (!dp_link) {
+		pr_err("invalid input\n");
+		goto exit;
+	}
+
+	link = container_of(dp_link, struct dp_link_private, dp_link);
+	if (!link) {
+		pr_err("link is null\n");
+		goto exit;
+	}
+
+	pr_debug("+++\n");
+
+	if (!(get_link_status(link->link_status, DP_SINK_STATUS) & DP_RECEIVE_PORT_0_STATUS)) {
+		pr_err("[205h] port0: out of sync, reset!\n");
+		link->link_status[DP_SINK_STATUS - DP_LANE0_1_STATUS] |= DP_RECEIVE_PORT_0_STATUS;
+	}
+
+	if (!(get_link_status(link->link_status, DP_LANE_ALIGN_STATUS_UPDATED) & DP_INTERLANE_ALIGN_DONE)) {
+		pr_err("[204h] interlane_align_done is zero, reset!\n");
+		link->link_status[DP_LANE_ALIGN_STATUS_UPDATED - DP_LANE0_1_STATUS] |= DP_INTERLANE_ALIGN_DONE;
+	}
+
+exit:
+	return;
+}
+
 /**
  * @retval true if connection is stable
  * @retval false if connection is unstable(poor)

@@ -363,7 +363,7 @@ static int cam_eeprom_update_module_info(struct cam_eeprom_ctrl_t *e_ctrl)
 #endif
 
 			if (strncmp(rear_phone_fw_ver, rear_fw_ver, HW_INFO_MAX_SIZE-1) == 0
-				&& strncmp(&rear_phone_fw_ver[HW_INFO_MAX_SIZE-1], &rear_fw_ver[HW_INFO_MAX_SIZE-1], SW_INFO_MAX_SIZE-1) >= 0) {
+				&& strncmp(&rear_phone_fw_ver[HW_INFO_MAX_SIZE-1], &rear_fw_ver[HW_INFO_MAX_SIZE-1], HW_INFO_MAX_SIZE) >= 0) {
 				CAM_INFO(CAM_EEPROM, "Load from phone");
 				strcpy(rear_load_fw_ver, rear_phone_fw_ver);
 				loadfrom = 'P';
