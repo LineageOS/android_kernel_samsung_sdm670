@@ -1918,6 +1918,10 @@ EXTRA_CFLAGS += -DSEC_WRITE_SOFTAP_INFO_IN_SYSFS
 EXTRA_CFLAGS += -DSEC_WRITE_ANT_GPIO_INFO_IN_SYSFS
 endif
 
+ifeq ($(CONFIG_WLAN_BEACON_CHECK),y)
+EXTRA_CFLAGS += -DSEC_CONFIG_WLAN_BEACON_CHECK
+endif
+
 # Currently, for versions of gcc which support it, the kernel Makefile
 # is disabling the maybe-uninitialized warning.  Re-enable it for the
 # WLAN driver.  Note that we must use EXTRA_CFLAGS here so that it

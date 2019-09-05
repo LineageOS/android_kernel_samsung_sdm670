@@ -60,10 +60,6 @@
 #include <linux/atomic.h>
 #endif
 
-#if defined(CONFIG_DRM)
-#include <linux/msm_drm_notify.h>
-#endif
-
 #ifdef CONFIG_OF
 #ifndef USE_OPEN_CLOSE
 #define USE_OPEN_CLOSE
@@ -111,31 +107,6 @@ struct delayed_work *p_debug_work;
 #if (!defined(CONFIG_PM)) && !defined(USE_OPEN_CLOSE)
 static int fts_suspend(struct i2c_client *client, pm_message_t mesg);
 static int fts_resume(struct i2c_client *client);
-#endif
-
-#if defined(CONFIG_DRM)
-static int dsi_panel_notifier_callback(struct notifier_block *self,
-				 unsigned long event, void *data)
-{
-	int blank;
-	struct msm_drm_notifier *evdata = data;
-	struct fts_ts_info *info =
-		container_of(self, struct fts_ts_info, dsi_panel_notif);
-
-	if (!evdata || !evdata->data || evdata->id != 0)
-		return 0;
-
-	blank = *(int *)(evdata->data);
-	if (event == MSM_DRM_EARLY_EVENT_BLANK) {
-		if (blank == MSM_DRM_BLANK_UNBLANK)
-			fts_start_device(info);
-	} else if (event == MSM_DRM_EVENT_BLANK) {
-		if (blank == MSM_DRM_BLANK_POWERDOWN)
-			fts_stop_device(info, info->lowpower_flag);
-	}
-
-	return 0;
-}
 #endif
 
 #if defined(CONFIG_INPUT_SEC_SECURE_TOUCH)
@@ -1854,9 +1825,9 @@ static u8 fts_event_handler_type_b(struct fts_ts_info *info)
 			if (p_gesture_status->sf == FTS_GESTURE_SAMSUNG_FEATURE) {
 				if ((info->lowpower_flag & FTS_MODE_DOUBLETAP_WAKEUP) &&
 						p_gesture_status->stype == FTS_SPONGE_EVENT_DOUBLETAP) {
-					input_report_key(info->input_dev, KEY_WAKEUP, 1);
+					input_report_key(info->input_dev, KEY_HOMEPAGE, 1);
 					input_sync(info->input_dev);
-					input_report_key(info->input_dev, KEY_WAKEUP, 0);
+					input_report_key(info->input_dev, KEY_HOMEPAGE, 0);
 					input_info(true, &info->client->dev, "%s: Dobule Tap Wake up\n", __func__);
 					break;
 				}
@@ -1865,9 +1836,9 @@ static u8 fts_event_handler_type_b(struct fts_ts_info *info)
 			{
 				if ((info->lowpower_flag & FTS_MODE_DOUBLETAP_WAKEUP) && p_gesture_status->gesture_id == 0x01) {
 					input_info(true, &info->client->dev, "%s: AOT\n", __func__);
-					input_report_key(info->input_dev, KEY_WAKEUP, 1);
+					input_report_key(info->input_dev, KEY_HOMEPAGE, 1);
 					input_sync(info->input_dev);
-					input_report_key(info->input_dev, KEY_WAKEUP, 0);
+					input_report_key(info->input_dev, KEY_HOMEPAGE, 0);
 				}
 			}
 			break;
@@ -2539,7 +2510,7 @@ static void fts_set_input_prop(struct fts_ts_info *info, struct input_dev *dev, 
 	set_bit(BTN_TOUCH, dev->keybit);
 	set_bit(BTN_TOOL_FINGER, dev->keybit);
 	set_bit(KEY_BLACK_UI_GESTURE, dev->keybit);
-	set_bit(KEY_WAKEUP, dev->keybit);
+	set_bit(KEY_HOMEPAGE, dev->keybit);
 
 #ifdef FTS_SUPPORT_TOUCH_KEY
 	if (info->board->support_mskey) {
@@ -2801,13 +2772,6 @@ static int fts_probe(struct i2c_client *client, const struct i2c_device_id *idp)
 #ifdef CONFIG_INPUT_SEC_SECURE_TOUCH
 	info->ss_drv = sec_secure_touch_register(info, info->board->ss_touch_num, &info->input_dev->dev.kobj);
 #endif
-#if defined(CONFIG_DRM)
-	info->dsi_panel_notif.notifier_call = dsi_panel_notifier_callback;
-	retval = msm_drm_register_client(&info->dsi_panel_notif);
-	if (retval)
-		input_err(true, &info->client->dev,
-				"%s: Unable to register dsi_panel_notifier: %d!\n", __func__, retval);
-#endif
 	info->probe_done = true;
 	input_info(true, &info->client->dev, "%s: done\n", __func__);
 	input_log_fix();
@@ -2827,9 +2791,6 @@ err_enable_irq:
 		info->input_dev_pad = NULL;
 	}
 err_register_input_pad:
-#ifdef CONFIG_DRM
-	msm_drm_unregister_client(&info->dsi_panel_notif);
-#endif
 	input_unregister_device(info->input_dev);
 	info->input_dev = NULL;
 	info->input_dev_touch = NULL;
@@ -2876,6 +2837,10 @@ static int fts_remove(struct i2c_client *client)
 
 	input_info(true, &info->client->dev, "%s\n", __func__);
 	info->shutdown_is_on_going = true;
+
+#if defined(CONFIG_USB_TYPEC_MANAGER_NOTIFIER) && defined(CONFIG_CCIC_NOTIFIER) && defined(FTS_SUPPORT_TA_MODE)
+	manager_notifier_unregister(&info->manager_nb);
+#endif
 
 	disable_irq_nosync(info->client->irq);
 	free_irq(info->client->irq, info);
@@ -2926,9 +2891,6 @@ static int fts_remove(struct i2c_client *client)
 
 	info->input_dev = info->input_dev_touch;
 	input_mt_destroy_slots(info->input_dev);
-#ifdef CONFIG_DRM
-	msm_drm_unregister_client(&info->dsi_panel_notif);
-#endif
 	input_unregister_device(info->input_dev);
 	info->input_dev = NULL;
 	info->input_dev_touch = NULL;
@@ -3198,7 +3160,7 @@ void fts_release_all_finger(struct fts_ts_info *info)
 	input_report_key(info->input_dev, BTN_TOUCH, 0);
 	input_report_key(info->input_dev, BTN_TOOL_FINGER, 0);
 
-	input_report_key(info->input_dev, KEY_WAKEUP, 0);
+	input_report_key(info->input_dev, KEY_HOMEPAGE, 0);
 
 	if (info->board->support_sidegesture) {
 		input_report_key(info->input_dev, KEY_SIDE_GESTURE, 0);
@@ -3468,7 +3430,7 @@ static int fts_start_device(struct fts_ts_info *info)
 		ret = fts_set_opmode(info, FTS_OPMODE_NORMAL);
 		if (ret < 0) {
 			info->reinit_done = false;
-			fts_reinit(info, true);
+			fts_reinit(info, false);
 			info->reinit_done = true;
 		}
 

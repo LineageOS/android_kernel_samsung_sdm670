@@ -2555,7 +2555,6 @@ static int qpnp_reset_enabled(const char *val, const struct kernel_param *kp)
 {
 	int ret = 0;
 	struct qpnp_pon_config *cfg;
-	u32 s2_type;
 
 	ret = param_set_bool(val, kp);
 	if (ret) {
@@ -2573,13 +2572,6 @@ static int qpnp_reset_enabled(const char *val, const struct kernel_param *kp)
 		qpnp_control_s2_reset(sys_reset_dev, cfg, 0);
 	}
 	else {
-		/* Configure reset type:
-		 * Debug level MID/HIGH: WARM Reset
-		 * Debug level LOW: HARD Reset
-		 */
-		s2_type = (sec_debug_is_enabled()) ?
-			PON_POWER_OFF_WARM_RESET : PON_POWER_OFF_DVDD_HARD_RESET;
-		qpnp_pon_masked_write(sys_reset_dev, cfg->s2_cntl_addr, QPNP_PON_S2_CNTL_TYPE_MASK, (u8)s2_type);
 		qpnp_control_s2_reset(sys_reset_dev, cfg, 1);
 	}
 
