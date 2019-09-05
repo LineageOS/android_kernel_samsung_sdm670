@@ -730,23 +730,22 @@ static ssize_t afc_off_store(struct device *dev,
 	unsigned int param_val;
 #ifdef CONFIG_MUIC_HV
 	int ret = 0;
+	union power_supply_propval psy_val;
 #endif
 	if (!strncmp(buf, "1", 1)) {
 		pr_info("%s, Disable AFC\n", __func__);
-		param_val = 1;
 		pdata->afc_disable = true;
 #ifdef CONFIG_SEC_FACTORY
 		muic_disable_afc(1);
 #endif
 	} else {
 		pr_info("%s, Enable AFC\n", __func__);
-		param_val = 0;
 		pdata->afc_disable = false;
 #ifdef CONFIG_SEC_FACTORY
 		muic_disable_afc(0);
 #endif
 	}
-
+	param_val = pdata->afc_disable ? '1' : '0';
 	pr_info("%s: param_val:%d\n", __func__, param_val);
 	#ifdef CONFIG_MUIC_HV
 	ret = sec_set_param(param_index_afc_disable, &param_val);
@@ -759,6 +758,9 @@ static ssize_t afc_off_store(struct device *dev,
 		pr_info("%s:%s afc_disable:%d (AFC %s)\n", MUIC_DEV_NAME,
 		__func__, pdata->afc_disable, pdata->afc_disable ? "Diabled": "Enabled");
 	}
+	psy_val.intval = param_val;
+	psy_do_property("battery", set,
+		POWER_SUPPLY_EXT_PROP_HV_DISABLE, psy_val);
 	#endif
 	return size;
 }

@@ -3817,9 +3817,11 @@ out:
 void fts_set_grip_data_to_ic(struct fts_ts_info *info, u8 flag)
 {
 	u8 data[4] = { 0 };
-	u8 regAdd[6] = {0xC3, 0x00, 0x00, 0x00, 0x00, 0x00};
+	u8 regAdd[11] = {0xC1, };
 
 	input_info(true, &info->client->dev, "%s: flag: %02X (clr,lan,nor,edg,han)\n", __func__, flag);
+
+	memset(&regAdd[1], 0x00, 10); 
 
 	if (flag & G_SET_EDGE_HANDLER) {
 		if (info->grip_edgehandler_direction == 0) {
@@ -3842,66 +3844,93 @@ void fts_set_grip_data_to_ic(struct fts_ts_info *info, u8 flag)
 		regAdd[5] = data[3];
 
 		fts_write_reg(info, regAdd, 6);
-		input_info(true, &info->client->dev, "%s: 0x%02X %02X,%02X,%02X,%02X\n",
-				__func__, FTS_CMD_EDGE_HANDLER, data[0], data[1], data[2], data[3]);
 	}
 
 	if (flag & G_SET_EDGE_ZONE) {
-		data[0] = (info->grip_edge_range >> 8) & 0xFF;
-		data[1] = info->grip_edge_range  & 0xFF;
-
+		/* ex) C1 07 00 3E 00 3E
+		*	- 0x003E(60) px : Grip Right zone
+		*	- 0x003E(60) px : Grip Left zone
+		*/
 		regAdd[1] = FTS_CMD_EDGE_AREA;
-		regAdd[2] = data[0];
-		regAdd[3] = data[1];
+		regAdd[2] = (info->grip_edge_range >> 8) & 0xFF;
+		regAdd[3] = info->grip_edge_range & 0xFF;
+		regAdd[4] = (info->grip_edge_range >> 8) & 0xFF;
+		regAdd[5] = info->grip_edge_range & 0xFF;
 
-		fts_write_reg(info, regAdd, 4);
-		input_info(true, &info->client->dev, "%s: 0x%02X %02X,%02X\n",
-				__func__, FTS_CMD_EDGE_AREA, data[0], data[1]);
+		fts_write_reg(info, regAdd, 6);
 	}
 
 	if (flag & G_SET_NORMAL_MODE) {
-		data[0] = info->grip_deadzone_up_x & 0xFF;
-		data[1] = info->grip_deadzone_dn_x & 0xFF;
-		data[2] = (info->grip_deadzone_y >> 8) & 0xFF;
-		data[3] = info->grip_deadzone_y & 0xFF;
-
+		/* ex) C1 08 1E 1E 00 00
+		*	- 0x1E (30) px : upper X range
+		*	- 0x1E (30) px : lower X range
+		*	- 0x0000 (0) px : division Y
+		*/
 		regAdd[1] = FTS_CMD_DEAD_ZONE;
-		regAdd[2] = data[0];
-		regAdd[3] = data[1];
-		regAdd[4] = data[2];
-		regAdd[5] = data[3];
+		regAdd[2] = info->grip_deadzone_up_x & 0xFF;
+		regAdd[3] = info->grip_deadzone_dn_x & 0xFF;
+		regAdd[4] = (info->grip_deadzone_y >> 8) & 0xFF;
+		regAdd[5] = info->grip_deadzone_y & 0xFF;
 
 		fts_write_reg(info, regAdd, 6);
-		input_info(true, &info->client->dev, "%s: 0x%02X %02X,%02X,%02X,%02X\n",
-				__func__, FTS_CMD_DEAD_ZONE, data[0], data[1], data[2], data[3]);
 	}
 
 	if (flag & G_SET_LANDSCAPE_MODE) {
-		data[0] = info->grip_landscape_mode & 0x1;
-		data[1] = (info->grip_landscape_edge >> 4) & 0xFF;
-		data[2] = (info->grip_landscape_edge << 4 & 0xF0) | ((info->grip_landscape_deadzone >> 8) & 0xF);
-		data[3] = info->grip_landscape_deadzone & 0xFF;
-
+		/* ex) C1 09 01 00 3C 00 3C 00 1E
+		*	- 0x01 : horizontal mode
+		*	- 0x03C (60) px : Grip zone range (Right)
+		*	- 0x03C (60) px : Grip zone range (Left)
+		*	- 0x01E (30) px : Reject zone range (Left/Right)
+		*/
 		regAdd[1] = FTS_CMD_LANDSCAPE_MODE;
-		regAdd[2] = data[0];
-		regAdd[3] = data[1];
-		regAdd[4] = data[2];
-		regAdd[5] = data[3];
+		regAdd[2] = info->grip_landscape_mode;
+		regAdd[3] = (info->grip_landscape_edge >> 8) & 0xFF;
+		regAdd[4] = info->grip_landscape_edge & 0xFF;
+		regAdd[5] = (info->grip_landscape_edge >> 8) & 0xFF;
+		regAdd[6] = info->grip_landscape_edge & 0xFF;
+		regAdd[7] = (info->grip_landscape_deadzone >> 8) & 0xFF;
+		regAdd[8] = info->grip_landscape_deadzone & 0xFF;
 
-		fts_write_reg(info, regAdd, 6);
-		input_info(true, &info->client->dev, "%s: 0x%02X %02X,%02X,%02X,%02X\n",
-				__func__, FTS_CMD_LANDSCAPE_MODE, data[0], data[1], data[2], data[3]);
+		fts_write_reg(info, regAdd, 9);
+
+		/*ex) C1 0A 01 00 3C 00 3C 00 1E 00 1E
+		*	- 0x01(1) : Enable function
+		*	- 0x003C (60) px : Grip Top zone range
+		*	- 0x001E (60) px : Grip Bottom zone range
+		*	- 0x001E (30) px : Reject Top zone range
+		*	- 0x001E (30) px : Reject Bottom zone range
+		*/
+		regAdd[1] = FTS_CMD_LANDSCAPE_TOP_BOTTOM;
+		regAdd[2] = info->grip_landscape_mode;
+		regAdd[3] = (info->grip_landscape_top_gripzone >> 8)& 0xFF;
+		regAdd[4] = info->grip_landscape_top_gripzone & 0xFF;
+		regAdd[5] = (info->grip_landscape_bottom_gripzone >> 8)& 0xFF;
+		regAdd[6] = info->grip_landscape_bottom_gripzone & 0xFF;
+		regAdd[7] = (info->grip_landscape_top_deadzone >> 8)& 0xFF;
+		regAdd[8] = info->grip_landscape_top_deadzone & 0xFF;
+		regAdd[9] = (info->grip_landscape_bottom_deadzone >> 8)& 0xFF;
+		regAdd[10] = info->grip_landscape_bottom_deadzone & 0xFF;
+
+		fts_write_reg(info, regAdd, 11);
 	}
 
 	if (flag & G_CLR_LANDSCAPE_MODE) {
-		data[0] = info->grip_landscape_mode;
+		memset(&regAdd[1], 0x00, 10); 
 
+		/* ex) C1 09  00 00 00 00 00 00 00
+		*	- 0x00 : Apply previous vertical mode value for grip zone and reject zone range
+		*/
 		regAdd[1] = FTS_CMD_LANDSCAPE_MODE;
-		regAdd[2] = data[0];
+		regAdd[2] = info->grip_landscape_mode;
 
-		fts_write_reg(info, regAdd, 3);
-		input_info(true, &info->client->dev, "%s: 0x%02X %02X\n",
-				__func__, FTS_CMD_LANDSCAPE_MODE, data[0]);
+		fts_write_reg(info, regAdd, 9);
+
+		/*ex) C1 0A 00 00 00 00 00 00 00 00 00
+		*	- Disable function
+		*/
+		regAdd[1] = FTS_CMD_LANDSCAPE_TOP_BOTTOM;
+
+		fts_write_reg(info, regAdd, 11);
 	}
 }
 
@@ -3979,6 +4008,8 @@ static void set_grip_data(void *device_data)
 			info->grip_landscape_deadzone = sec->cmd_param[3];
 			info->grip_landscape_top_deadzone = sec->cmd_param[4];
 			info->grip_landscape_bottom_deadzone = sec->cmd_param[5];
+			info->grip_landscape_top_gripzone = sec->cmd_param[6];
+			info->grip_landscape_bottom_gripzone = sec->cmd_param[7];
 			mode = mode | G_SET_LANDSCAPE_MODE;
 		} else {
 			input_err(true, &info->client->dev, "%s: cmd1 is abnormal, %d (%d)\n",

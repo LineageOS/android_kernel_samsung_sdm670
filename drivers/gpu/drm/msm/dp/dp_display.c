@@ -344,6 +344,10 @@ static void dp_display_hdcp_cb_work(struct work_struct *work)
 
 	switch (dp->link->hdcp_status.hdcp_state) {
 	case HDCP_STATE_AUTHENTICATING:
+#ifdef CONFIG_SEC_DISPLAYPORT
+		if (dp->link->hdcp_status.hdcp_version < HDCP_VERSION_2P2)
+			secdp_reset_link_status(dp->link);			
+#endif
 		if (dp->hdcp.ops && dp->hdcp.ops->authenticate)
 			rc = dp->hdcp.ops->authenticate(dp->hdcp.data);
 		break;

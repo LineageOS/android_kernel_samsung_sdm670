@@ -62,7 +62,10 @@ void process_cc_water_det(void * data);
 
 #ifdef CONFIG_MUIC_SM5705_SWITCH_CONTROL_GPIO
 extern int muic_GPIO_control(int gpio);
-int muic_GPIO_init_check = 0;
+#endif
+
+#if defined(CONFIG_USB_DWC3)
+extern void dwc3_set_selfpowered(u8 enable);
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -857,23 +860,27 @@ void process_cc_attach(void * data,u8 *plug_attach_done)
 					CCIC_NOTIFY_ID_POWER_STATUS, 0, 0, 0);
 			vbus_turn_on_ctrl(1);
 		}
-		
-		if (usbpd_data->is_dr_swap || usbpd_data->is_pr_swap) {
-			dev_info(&i2c->dev, "%s - ignore all pd_state by %s\n",	__func__,(usbpd_data->is_dr_swap ? "dr_swap" : "pr_swap"));
-			return;
-		}
 
 #if defined(CONFIG_TYPEC)
 		if (usbpd_data->pd_state == State_PE_SRC_Ready || usbpd_data->pd_state == State_PE_SNK_Ready)
 		{
 			usbpd_data->pd_support = true;
+#if defined(CONFIG_USB_DWC3)
+			dwc3_set_selfpowered(1);
+#endif
 			typec_set_pwr_opmode(usbpd_data->port, TYPEC_PWR_MODE_PD);
 #ifdef CONFIG_MUIC_SM5705_SWITCH_CONTROL_GPIO
-			pr_info("%s Set muic GPIO to keep muic path\n", __func__);
-		        muic_GPIO_control(1);
+			pr_info("%s call muic_GPIO_control(0)\n", __func__);
+			muic_GPIO_control(0);
 #endif
 		}
-#endif		
+#endif
+
+		if (usbpd_data->is_dr_swap || usbpd_data->is_pr_swap) {
+			dev_info(&i2c->dev, "%s - ignore all pd_state by %s\n",	__func__,(usbpd_data->is_dr_swap ? "dr_swap" : "pr_swap"));
+			return;
+		}
+
 		switch (usbpd_data->pd_state) {
 		case State_PE_SRC_Send_Capabilities:
 		case State_PE_SRC_Negotiate_Capability:
@@ -963,6 +970,13 @@ void process_cc_attach(void * data,u8 *plug_attach_done)
 					CCIC_NOTIFY_DEV_MUIC, CCIC_NOTIFY_ID_ATTACH,
 					1/*attach*/, 0/*rprd*/,
 					(Func_DATA.BITS.VBUS_CC_Short || Func_DATA.BITS.VBUS_SBU_Short) ? Rp_Abnormal:Func_DATA.BITS.RP_CurrentLvl);
+
+                                if (Func_DATA.BITS.VBUS_CC_Short || Func_DATA.BITS.VBUS_SBU_Short)
+			                usbpd_data->short_detected = true;
+                                else
+			                usbpd_data->short_detected = false;
+				        
+                                dev_info(&i2c->dev, "%s short_detected: %s\n", __func__, usbpd_data->short_detected ? "true" : "false");
 			} else {
 				/* muic */
 				ccic_event_work(usbpd_data,
@@ -992,6 +1006,7 @@ void process_cc_attach(void * data,u8 *plug_attach_done)
 		usbpd_data->plug_rprd_sel = 0;
 		usbpd_data->is_dr_swap = 0;
 		usbpd_data->is_pr_swap = 0;
+                usbpd_data->short_detected = false;
 #if defined(CONFIG_CCIC_S2MM005_ANALOG_AUDIO)
 		if(earphone_state == 1){
 			printk("%s : Type-C Analog Headset detached\n",__func__);
@@ -1068,6 +1083,9 @@ void process_cc_attach(void * data,u8 *plug_attach_done)
 			}			
 #endif
 			usbpd_data->pd_support = false;
+#if defined(CONFIG_USB_DWC3)
+			dwc3_set_selfpowered(0);
+#endif
 			send_otg_notify(o_notify, NOTIFY_EVENT_POWER_SOURCE, 0);
 			ccic_event_work(usbpd_data,
 				CCIC_NOTIFY_DEV_USB, CCIC_NOTIFY_ID_USB, 0/*attach*/, USB_STATUS_NOTIFY_DETACH/*drp*/, 0);
@@ -1080,9 +1098,6 @@ void process_cc_attach(void * data,u8 *plug_attach_done)
 #endif
 		}
 		usbpd_data->detach_done_wait = 1;
-#ifdef CONFIG_MUIC_SM5705_SWITCH_CONTROL_GPIO
-		muic_GPIO_control(0);
-#endif
 	}
 	prev_pd_state = usbpd_data->pd_state;
 }
@@ -1261,13 +1276,8 @@ void process_cc_rid(void *data)
 		if ((rid == RID_000K) || (rid == RID_001K) || (rid == RID_523K) || (rid == RID_619K)
                     || (rid == RID_255K) || (rid == RID_301K))
 			muic_GPIO_control(1);
-                else if ((rid == RID_UNDEFINED) || (rid == RID_OPEN)) {
-                        if (!muic_GPIO_init_check) {
-			    pr_info("%s init muic GPIO with rid_open\n", __func__);
-                            muic_GPIO_control(0);
-                        }
-                }
-                muic_GPIO_init_check = 1;
+        else if ((rid == RID_UNDEFINED) || (rid == RID_OPEN))
+            muic_GPIO_control(0);
 #endif
 		if(prev_rid != rid)
 		{

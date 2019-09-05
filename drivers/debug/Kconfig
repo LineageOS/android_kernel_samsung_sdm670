@@ -211,6 +211,11 @@ config SEC_PERIPHERAL_SECURE_CHK
 	help
 	  This option enables checking the authentication of peripheral image.
 
+config SEC_DEBUG_PWDT
+	bool "Platform Watchdog check"
+	default n
+	help
+	  To check Platform Watchdog thread status
 endif
 
 config SEC_QUEST
