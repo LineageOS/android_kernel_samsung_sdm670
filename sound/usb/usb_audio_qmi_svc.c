@@ -875,11 +875,9 @@ static void uaudio_disconnect_cb(struct snd_usb_audio *chip)
 		ret = qmi_send_ind(svc->uaudio_svc_hdl, svc->curr_conn,
 				&uaudio_stream_ind_desc, &disconnect_ind,
 				sizeof(disconnect_ind));
-		if (ret < 0) {
-			pr_err("%s: qmi send failed wiht err: %d\n",
+		if (ret < 0)
+			pr_err("%s: qmi send failed with err: %d\n",
 					__func__, ret);
-			return;
-		}
 
 		ret = wait_event_interruptible(dev->disconnect_wq,
 				!atomic_read(&dev->in_use));
