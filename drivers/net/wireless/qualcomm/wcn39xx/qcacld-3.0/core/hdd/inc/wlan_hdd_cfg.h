@@ -17913,6 +17913,7 @@ struct hdd_config {
 #ifdef WLAN_ADAPTIVE_11R
 	bool enable_adaptive_11r;
 #endif
+	bool p2p_disable_roam;
 };
 
 #define VAR_OFFSET(_Struct, _Var) (offsetof(_Struct, _Var))
@@ -17923,6 +17924,26 @@ struct hdd_config {
 /* bit 0 is Required or Optional */
 #define VAR_FLAGS_REQUIRED     (1 << 0)
 #define VAR_FLAGS_OPTIONAL     (0 << 0)
+
+/*
+ * <ini>
+ * p2p_disable_roam- Disable Roam on sta interface during P2P connection
+ * @Min: 0 - Roam Enabled on sta interface during P2P connection
+ * @Max: 1 - Roam Disabled on sta interface during P2P connection
+ * @Default: 0
+ *
+ * Disable roaming on STA iface to avoid audio glitches on p2p if its connected
+ *
+ * Supported Feature: Disable Roam during P2P
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_P2P_DISABLE_ROAM            "p2p_disable_roam"
+#define CFG_P2P_DISABLE_ROAM_MIN         (0)
+#define CFG_P2P_DISABLE_ROAM_MAX         (1)
+#define CFG_P2P_DISABLE_ROAM_DEFAULT     (0)
 
 /*
  * bit 1 tells if range checking is required.
