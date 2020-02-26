@@ -482,6 +482,9 @@ void sec_debug_update_restart_reason(const char *cmd, const int in_panic)
 		{ "shell",
 			PON_RESTART_REASON_NORMALBOOT,
 			RESTART_REASON_NORMAL, NULL },
+		{ "from_fastboot",
+			PON_RESTART_REASON_NORMALBOOT,
+			RESTART_REASON_NORMAL, NULL },
 	};
 	enum pon_restart_reason pon_rr = (!in_panic) ?
 				PON_RESTART_REASON_NORMALBOOT :
