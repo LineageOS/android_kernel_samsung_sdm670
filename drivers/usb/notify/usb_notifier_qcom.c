@@ -401,7 +401,7 @@ static struct otg_notify sec_otg_notify = {
 	.vbus_detect_gpio = -1,
 	.is_wakelock = 1,
 	.is_host_wakelock = 0,
-	.booting_delay_sec = 10,
+	.booting_delay_sec = 0,
 	.disable_control = 1,
 	.device_check_sec = 3,
 #if !defined(CONFIG_CCIC_NOTIFIER)
