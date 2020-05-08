@@ -36,6 +36,8 @@
 #include "pcm.h"
 #include "usb_audio_qmi_v01.h"
 
+#define DEV_RELEASE_WAIT_TIMEOUT 10000 /* in ms */
+
 #define SND_PCM_CARD_NUM_MASK 0xffff0000
 #define SND_PCM_DEV_NUM_MASK 0xff00
 #define SND_PCM_STREAM_DIRECTION 0xff
@@ -879,12 +881,14 @@ static void uaudio_disconnect_cb(struct snd_usb_audio *chip)
 			pr_err("%s: qmi send failed with err: %d\n",
 					__func__, ret);
 
-		ret = wait_event_interruptible(dev->disconnect_wq,
-				!atomic_read(&dev->in_use));
-		if (ret < 0) {
-			pr_debug("%s: failed with ret %d\n", __func__, ret);
-			return;
-		}
+		ret = wait_event_interruptible_timeout(dev->disconnect_wq,
+				!atomic_read(&dev->in_use),
+				msecs_to_jiffies(DEV_RELEASE_WAIT_TIMEOUT));
+		if (!ret)
+			pr_err("timeout while waiting for dev_release\n");
+		else if (ret < 0)
+			pr_err("failed with ret %d\n", ret);
+
 		mutex_lock(&chip->dev_lock);
 	}
 
@@ -1092,13 +1096,17 @@ static int handle_uaudio_stream_req(void *req_h, void *req)
 
 response:
 	if (!req_msg->enable && ret != -EINVAL) {
-		if (info_idx >= 0) {
-			mutex_lock(&chip->dev_lock);
-			info = &uadev[pcm_card_num].info[info_idx];
-			uaudio_dev_intf_cleanup(uadev[pcm_card_num].udev, info);
-			pr_debug("%s:release resources: intf# %d card# %d\n",
-				__func__, subs->interface, pcm_card_num);
-			mutex_unlock(&chip->dev_lock);
+		if (ret != -ENODEV) {
+			if (info_idx >= 0) {
+				mutex_lock(&chip->dev_lock);
+				info = &uadev[pcm_card_num].info[info_idx];
+				uaudio_dev_intf_cleanup(
+					uadev[pcm_card_num].udev,
+					info);
+				pr_debug("%s:release resources: intf# %d card# %d\n",
+					__func__, subs->interface, pcm_card_num);
+				mutex_unlock(&chip->dev_lock);
+			}
 		}
 		if (atomic_read(&uadev[pcm_card_num].in_use))
 			kref_put(&uadev[pcm_card_num].kref,
