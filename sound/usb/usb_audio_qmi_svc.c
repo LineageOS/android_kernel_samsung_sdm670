@@ -884,10 +884,13 @@ static void uaudio_disconnect_cb(struct snd_usb_audio *chip)
 		ret = wait_event_interruptible_timeout(dev->disconnect_wq,
 				!atomic_read(&dev->in_use),
 				msecs_to_jiffies(DEV_RELEASE_WAIT_TIMEOUT));
-		if (!ret)
+		if (!ret) {
 			pr_err("timeout while waiting for dev_release\n");
-		else if (ret < 0)
+			atomic_set(&dev->in_use, 0);
+		} else if (ret < 0) {
 			pr_err("failed with ret %d\n", ret);
+			atomic_set(&dev->in_use, 0);
+		}
 
 		mutex_lock(&chip->dev_lock);
 	}
@@ -1095,18 +1098,16 @@ static int handle_uaudio_stream_req(void *req_h, void *req)
 	mutex_unlock(&chip->dev_lock);
 
 response:
-	if (!req_msg->enable && ret != -EINVAL) {
-		if (ret != -ENODEV) {
-			if (info_idx >= 0) {
-				mutex_lock(&chip->dev_lock);
-				info = &uadev[pcm_card_num].info[info_idx];
-				uaudio_dev_intf_cleanup(
-					uadev[pcm_card_num].udev,
-					info);
-				pr_debug("%s:release resources: intf# %d card# %d\n",
-					__func__, subs->interface, pcm_card_num);
-				mutex_unlock(&chip->dev_lock);
-			}
+	if (!req_msg->enable && (ret != -EINVAL || ret != -ENODEV)) {
+		if (info_idx >= 0) {
+			mutex_lock(&chip->dev_lock);
+			info = &uadev[pcm_card_num].info[info_idx];
+			uaudio_dev_intf_cleanup(
+				uadev[pcm_card_num].udev,
+				info);
+			pr_debug("%s:release resources: intf# %d card# %d\n",
+				__func__, subs->interface, pcm_card_num);
+			mutex_unlock(&chip->dev_lock);
 		}
 		if (atomic_read(&uadev[pcm_card_num].in_use))
 			kref_put(&uadev[pcm_card_num].kref,
