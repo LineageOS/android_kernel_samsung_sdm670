@@ -1792,6 +1792,7 @@ char *cmd_set_prop_map[SS_DSI_CMD_SET_MAX] = {
 	"samsung,acl_on_tx_cmds_revA",
 	"samsung,acl_off_tx_cmds_revA",
 	"samsung,elvss_tx_cmds_revA",
+	"samsung,elvss_2_tx_cmds_revA",
 	"samsung,elvss_high_tx_cmds_revA",
 	"samsung,elvss_mid_tx_cmds_revA",
 	"samsung,elvss_low_tx_cmds_revA",

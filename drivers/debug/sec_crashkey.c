@@ -127,9 +127,6 @@ static void __sec_debug_check_hard_reset_key(unsigned int value, int down)
 	size_t i;
 	static unsigned int key_bitmap;
 
-	if (unlikely(!sec_debug_is_enabled()))
-		return;
-
 	for (i = 0; i < hardreset_key.size; i++) {
 		if (hardreset_key.keycode[i] == value) {
 			key_bitmap &= (~(1 << i));
@@ -142,10 +139,17 @@ static void __sec_debug_check_hard_reset_key(unsigned int value, int down)
 
 	if (down) {
 		key_bitmap |= (1 << i);
-		if (key_bitmap == ((1 << hardreset_key.size) - 1))
+		if (key_bitmap == ((1 << hardreset_key.size) - 1)) {
+			if (unlikely(!sec_debug_is_enabled())) {
+				sec_debug_set_upload_cause(UPLOAD_CAUSE_POWER_LONG_PRESS);
+				return;
+			}
 			__sec_crash_timer_set(&__longkey_timer, &hardreset_key);
-	} else
+		}
+	} else {
+		sec_debug_set_upload_cause(UPLOAD_CAUSE_INIT);
 		__sec_clear_crash_timer(&__longkey_timer);
+	}
 }
 
 static void __sec_debug_check_crash_key(unsigned int value, int down)
@@ -161,17 +165,12 @@ static void __sec_debug_check_crash_key(unsigned int value, int down)
 	__sec_clear_crash_timer(&__crash_timer);
 
 	if (!down) {
-		sec_debug_set_upload_cause(UPLOAD_CAUSE_INIT);
-
 		if (unlock != __sec_crash_key->unlock ||
 		    value != __sec_crash_key->trigger)
 			goto __clear_all;
 		else
 			return;
 	}
-
-	if (KEY_POWER == value)
-		sec_debug_set_upload_cause(UPLOAD_CAUSE_POWER_LONG_PRESS);
 
 	if (unlikely(!sec_debug_is_enabled()))
 		return;

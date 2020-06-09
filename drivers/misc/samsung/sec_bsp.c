@@ -46,7 +46,13 @@ static struct device *sec_bsp_dev;
 
 static bool console_enabled;
 static unsigned int __is_boot_recovery;
+static unsigned int __is_boot_lpm;
 static bool bootcompleted=false;
+
+#ifdef CONFIG_SEC_DEBUG_PWDT
+static unsigned int __is_verifiedboot_state;
+#endif
+
 
 static const char *boot_prefix[16] = {
 	BOOT_EVT_PREFIX BOOT_EVT_PREFIX_PLATFORM,
@@ -248,6 +254,47 @@ unsigned int is_boot_recovery(void)
 	return __is_boot_recovery;
 }
 EXPORT_SYMBOL(is_boot_recovery);
+
+static int lpm_check(char *str)
+{
+	if (strncmp(str, "charger", 7) == 0)
+		__is_boot_lpm = 1;
+	else
+		__is_boot_lpm = 0;
+
+	return __is_boot_lpm;
+}
+early_param("androidboot.mode", lpm_check);
+
+unsigned int is_boot_lpm(void)
+{
+	return __is_boot_lpm;
+}
+EXPORT_SYMBOL(is_boot_lpm);
+
+#ifdef CONFIG_SEC_DEBUG_PWDT
+static int  verifiedboot_state_param(char *str)
+{
+	static const char unlocked[] = "orange";
+
+	if (!str)
+		return -EINVAL;
+
+	if (strncmp(str, unlocked, sizeof(unlocked)) == 0)
+		__is_verifiedboot_state = 1;
+	else
+		__is_verifiedboot_state = 0;
+
+	return __is_verifiedboot_state;
+}
+early_param("androidboot.verifiedbootstate", verifiedboot_state_param);
+
+unsigned int is_verifiedboot_state(void)
+{
+	return __is_verifiedboot_state;
+}
+EXPORT_SYMBOL(is_verifiedboot_state);
+#endif
 
 static int sec_boot_stat_proc_show(struct seq_file *m, void *v)
 {

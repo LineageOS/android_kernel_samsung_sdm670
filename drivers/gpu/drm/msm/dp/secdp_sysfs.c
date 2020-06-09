@@ -115,6 +115,11 @@ static ssize_t secdp_dex_show(struct class *class,
 	struct secdp_sysfs_private *sysfs = g_secdp_sysfs;
 	struct secdp_dex *dex = &sysfs->sec->dex;
 
+	if (!secdp_get_cable_status() || !secdp_get_hpd_status()) {
+		pr_info("cable is out\n");
+		dex->prev = dex->curr = dex->dex_node_status = DEX_DISABLED;
+	}
+
 	pr_info("prev: %d, curr: %d, dex_node_status: %d\n", dex->prev, dex->curr, dex->dex_node_status);
 	rc = scnprintf(buf, PAGE_SIZE, "%d\n", dex->dex_node_status);
 
@@ -169,6 +174,7 @@ static ssize_t secdp_dex_store(struct class *class,
 
 	if (!secdp_get_cable_status() || !secdp_get_hpd_status()) {
 		pr_info("cable is out\n");
+		dex->prev = dex->curr = dex->dex_node_status = DEX_DISABLED;
 		goto exit;
 	}
 

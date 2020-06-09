@@ -339,6 +339,7 @@ struct samsung_display_dtsi_data {
 	bool samsung_lp11_init;
 	bool samsung_lp11_off;
 	bool samsung_tcon_clk_on_support;
+	bool samsung_elvss_compensation;
 
 	/* Anapass DDI's unique power sequence:
 	 * VDD on -> LP11 -> reset -> wait TCON RDY high -> HS clock.
@@ -584,6 +585,7 @@ struct panel_func {
 	struct dsi_panel_cmd_set * (*samsung_brightness_acl_off)(struct samsung_display_driver_data *vdd, int *level_key);
 	struct dsi_panel_cmd_set * (*samsung_brightness_pre_elvss)(struct samsung_display_driver_data *vdd, int *level_key);
 	struct dsi_panel_cmd_set * (*samsung_brightness_elvss)(struct samsung_display_driver_data *vdd, int *level_key);
+	struct dsi_panel_cmd_set * (*samsung_brightness_elvss_2)(struct samsung_display_driver_data *vdd, int *level_key);
 	struct dsi_panel_cmd_set *(*samsung_brightness_pre_caps)(struct samsung_display_driver_data *vdd, int *level_key);
 	struct dsi_panel_cmd_set *(*samsung_brightness_caps)(struct samsung_display_driver_data *vdd, int *level_key);
 	struct dsi_panel_cmd_set * (*samsung_brightness_elvss_temperature1)(struct samsung_display_driver_data *vdd, int *level_key);

@@ -43,9 +43,9 @@ config SEC_GTS4LV_KOR_PROJECT
 config SEC_GTS4LV_USA_PROJECT
         depends on SEC_GTS4LV_PROJECT
         default n
-        bool "Samsung GTS4LV USA VZW Project"
+        bool "Samsung GTS4LV USA Project"
         help
-          Support for Samsung GTS4LV USA VZW Project
+          Support for Samsung GTS4LV USA Project
 
 config SEC_A8SQLTE_PROJECT
 	depends on ARCH_SDM670

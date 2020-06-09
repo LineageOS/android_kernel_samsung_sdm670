@@ -211,6 +211,11 @@ config SEC_PERIPHERAL_SECURE_CHK
 	help
 	  This option enables checking the authentication of peripheral image.
 
+config SEC_DEBUG_PWDT
+	bool "Platform Watchdog check"
+	default n
+	help
+	  To check Platform Watchdog thread status
 endif
 
 config SEC_QUEST
@@ -229,23 +234,5 @@ config SEC_SKP
 	bool "Samsung SKP Feature"
 	default n
 	help
-	  Samsung SKP Feature, to test chipset quality	  	  
-
-choice
-	prompt "Version of GAF structure"
-	depends on SEC_DEBUG
-	default SEC_DEBUG_GAF_V5 if PROCA
-	default SEC_DEBUG_GAF_V4 if FIVE
-
-	config SEC_DEBUG_GAF_V4
-		bool "Use GAF structure version 4"
-		help
-		  Default option for FIVE-enabled kernel
-
-	config SEC_DEBUG_GAF_V5
-		bool "Use GAF structure version 5"
-		help
-		  Default option for kernel with PROCA LSM module.
-
-endchoice
+	  Samsung SKP Feature, to test chipset quality
 
