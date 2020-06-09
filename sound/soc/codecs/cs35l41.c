@@ -2056,13 +2056,13 @@ static int cs35l41_probe(struct platform_device *pdev)
 	}
 
 	ret = regmap_read(cs35l41->regmap, CS35L41_DEVID, &regid);
-	if (ret < 0) {
+	if (ret != 0) {
 		dev_err(cs35l41->dev, "Get Device ID failed\n");
 		goto err;
 	}
 
 	ret = regmap_read(cs35l41->regmap, CS35L41_REVID, &reg_revid);
-	if (ret < 0) {
+	if (ret != 0) {
 		dev_err(cs35l41->dev, "Get Revision ID failed\n");
 		goto err;
 	}
@@ -2100,9 +2100,6 @@ static int cs35l41_probe(struct platform_device *pdev)
 			CS35L41_INT1_MASK_DEFAULT);
 
 	cs35l41_dsp_init(cs35l41);
-
-	if (ret != 0)
-		goto err;
 
 	switch (reg_revid) {
 	case CS35L41_REVID_A0:

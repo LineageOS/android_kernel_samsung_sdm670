@@ -11,6 +11,3 @@ obj-$(CONFIG_SEC_DEBUG_DOUBLE_FREE) += sec_debug-dfd.o
 obj-$(CONFIG_SEC_DEBUG_SUMMARY) += sec_debug_summary.o
 obj-$(CONFIG_SEC_QUEST)		+= sec_quest.o
 obj-$(CONFIG_SEC_QUEST)		+= spinlock_test.o
-
-obj-$(CONFIG_SEC_DEBUG_GAF_V4)		+= sec_gaf_v4.o
-obj-$(CONFIG_SEC_DEBUG_GAF_V5)		+= sec_gaf_v5.o

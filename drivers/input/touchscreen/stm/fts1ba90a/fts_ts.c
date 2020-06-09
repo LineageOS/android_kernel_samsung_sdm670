@@ -2877,6 +2877,10 @@ static int fts_remove(struct i2c_client *client)
 	input_info(true, &info->client->dev, "%s\n", __func__);
 	info->shutdown_is_on_going = true;
 
+#if defined(CONFIG_USB_TYPEC_MANAGER_NOTIFIER) && defined(CONFIG_CCIC_NOTIFIER) && defined(FTS_SUPPORT_TA_MODE)
+	manager_notifier_unregister(&info->manager_nb);
+#endif
+
 	disable_irq_nosync(info->client->irq);
 	free_irq(info->client->irq, info);
 
@@ -3468,7 +3472,7 @@ static int fts_start_device(struct fts_ts_info *info)
 		ret = fts_set_opmode(info, FTS_OPMODE_NORMAL);
 		if (ret < 0) {
 			info->reinit_done = false;
-			fts_reinit(info, true);
+			fts_reinit(info, false);
 			info->reinit_done = true;
 		}
 

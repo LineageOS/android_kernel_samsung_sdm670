@@ -45,6 +45,10 @@
 #include <linux/kthread.h>
 #include <linux/version.h>
 
+#ifdef CONFIG_PM_WAKELOCKS
+#include <linux/pm_wakeup.h>
+#endif
+
 #include "dbmdx-interface.h"
 #include "dbmdx-customer.h"
 #include "dbmdx-va-regmap.h"
@@ -13685,6 +13689,12 @@ static irqreturn_t dbmdx_sv_interrupt_soft(int irq, void *dev)
 	dev_dbg(p->dev, "%s\n", __func__);
 
 	if ((p->device_ready) && (p->va_flags.irq_inuse)) {
+
+#ifdef CONFIG_PM_WAKELOCKS
+		__pm_wakeup_event(&(p->ps_nosuspend_wl),
+					DBMDX_WAKELOCK_IRQ_TIMEOUT_MS);
+#endif
+		
 #ifdef DBMDX_PROCESS_DETECTION_IRQ_WITHOUT_WORKER
 		dbmdx_process_detection_irq(p, true);
 #else
@@ -13802,6 +13812,10 @@ static int dbmdx_get_va_resources(struct dbmdx_private *p)
 			__func__);
 		goto err_free_irq;
 	}
+#ifdef CONFIG_PM_WAKELOCKS
+	wakeup_source_init(&p->ps_nosuspend_wl,
+					"dbmdx_nosuspend_wakelock");
+#endif
 
 	return 0;
 err_free_irq:
@@ -13835,6 +13849,10 @@ static void dbmdx_free_va_resources(struct dbmdx_private *p)
 		free_irq(p->sv_irq, p);
 	}
 	sysfs_remove_group(&p->dev->kobj, &dbmdx_va_attribute_group);
+#ifdef CONFIG_PM_WAKELOCKS
+	wakeup_source_trash(&p->ps_nosuspend_wl);
+#endif
+	
 }
 
 static int dbmdx_get_vqe_resources(struct dbmdx_private *p)

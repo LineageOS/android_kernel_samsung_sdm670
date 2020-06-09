@@ -746,6 +746,13 @@
 			39 01 00 00 00 00 02 B2 00 /* 38: 4-2cd */
 		];
 
+		samsung,elvss_2_tx_cmds_revA = [
+			15 01 00 00 00 00 02 B0 67
+			39 01 00 00 00 00 02 B2 00
+			15 01 00 00 00 00 02 B0 70
+			39 01 00 00 00 00 02 B2 00
+		];
+
 		/* bl_level, Index in elvss command list */
 		samsung,elvss_map_table_revA = <
 		     /* candela elvss_tx_cmd_id */

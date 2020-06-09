@@ -682,6 +682,8 @@ static bool secdp_check_supported_resolution(struct drm_display_mode *mode, stru
 
 	if (mode->clock > dp_disp->max_pclk_khz)
 		return false;
+	if (dp_disp->validate_mode(dp_disp, mode->clock) == MODE_BAD)
+		return false;
 
 #if !defined (CONFIG_SEC_FACTORY) && defined (SECDP_MAX_RESOLUTION_4K30)
 	/*When there is QHD 60hz DP resolution, max DP resolution 4K@30hz change to  QHD 60hz.*/
@@ -812,8 +814,6 @@ enum drm_mode_status dp_connector_mode_valid(struct drm_connector *connector,
 		ret = MODE_BAD;
 		goto end;
 	}
-
-	ret = dp_disp->validate_mode(dp_disp, mode->clock);
 
 end:
 	pr_info("%s@%dhz | %s | max_pclk: %d | cur_pclk: %d\n", mode->name,

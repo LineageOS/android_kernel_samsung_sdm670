@@ -913,5 +913,7 @@ struct s2mm005_data {
 	struct delayed_work usb_external_notifier_register_work;
 	struct notifier_block usb_external_notifier_nb;
 	int detach_done_wait;
+
+	bool short_detected;
 };
 #endif /* __S2MM005_H */

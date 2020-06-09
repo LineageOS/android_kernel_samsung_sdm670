@@ -76,6 +76,7 @@ enum sec_battery_rp_curr {
 	RP_CURRENT_RP1 = 500,
 	RP_CURRENT_RP2 = 1500,
 	RP_CURRENT_RP3 = 3000,
+	RP_CURRENT_ABNORMAL_RP3 = 1800,
 };
 
 enum power_supply_ext_health {
@@ -1127,6 +1128,9 @@ static inline struct power_supply *get_power_supply_by_name(char *name)
 	cable_type == SEC_BATTERY_CABLE_NONE || \
 	cable_type == SEC_BATTERY_CABLE_OTG || \
 	cable_type == SEC_BATTERY_CABLE_POWER_SHARING)
+
+#define is_pd_wire_type(cable_type) ( \
+	cable_type == SEC_BATTERY_CABLE_PDIC)
 
 #define is_slate_mode(battery) ((battery->current_event & SEC_BAT_CURRENT_EVENT_SLATE) \
 		== SEC_BAT_CURRENT_EVENT_SLATE)

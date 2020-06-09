@@ -2721,6 +2721,21 @@ void sde_encoder_virt_restore(struct drm_encoder *drm_enc)
 	_sde_encoder_virt_enable_helper(drm_enc);
 }
 
+static void sde_encoder_off_work(struct kthread_work *work)
+{
+	struct sde_encoder_virt *sde_enc = container_of(work,
+		struct sde_encoder_virt, delayed_off_work.work);
+	struct drm_encoder *drm_enc;
+
+	if (!sde_enc) {
+		SDE_ERROR("invalid sde encoder\n");
+		return;
+	}
+	drm_enc = &sde_enc->base;
+
+	sde_encoder_idle_request(drm_enc);
+}
+
 static void sde_encoder_virt_enable(struct drm_encoder *drm_enc)
 {
 	struct sde_encoder_virt *sde_enc = NULL;
@@ -2780,6 +2795,10 @@ static void sde_encoder_virt_enable(struct drm_encoder *drm_enc)
 		else
 			sde_enc->input_handler_registered = true;
 	}
+
+	if (!(msm_is_mode_seamless_vrr(cur_mode) || msm_is_mode_seamless_dms(cur_mode)))
+		kthread_init_delayed_work(&sde_enc->delayed_off_work, 
+			sde_encoder_off_work);
 
 	ret = sde_encoder_resource_control(drm_enc, SDE_ENC_RC_EVENT_KICKOFF);
 	if (ret) {
@@ -3107,19 +3126,22 @@ int sde_encoder_idle_request(struct drm_encoder *drm_enc)
 	return 0;
 }
 
-static void sde_encoder_off_work(struct kthread_work *work)
+int sde_encoder_get_ctlstart_timeout_state(struct drm_encoder *drm_enc)
 {
-	struct sde_encoder_virt *sde_enc = container_of(work,
-			struct sde_encoder_virt, delayed_off_work.work);
-	struct drm_encoder *drm_enc;
+	struct sde_encoder_virt *sde_enc = NULL;
+	int i, count = 0;
 
-	if (!sde_enc) {
-		SDE_ERROR("invalid sde encoder\n");
-		return;
+	if (!drm_enc)
+		return 0;
+
+	sde_enc = to_sde_encoder_virt(drm_enc);
+
+	for (i = 0; i < sde_enc->num_phys_encs; i++) {
+		count += atomic_read(&sde_enc->phys_encs[i]->ctlstart_timeout);
+		atomic_set(&sde_enc->phys_encs[i]->ctlstart_timeout, 0);
 	}
-	drm_enc = &sde_enc->base;
 
-	sde_encoder_idle_request(drm_enc);
+	return count;
 }
 
 /**

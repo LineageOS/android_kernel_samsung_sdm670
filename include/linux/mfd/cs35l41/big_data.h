@@ -22,7 +22,7 @@
 #define CS35L41_BD_EXC_RADIX		19
 
 #define CIRRUS_BD_NUM_ATTRS_BASE	1
-#define CIRRUS_BD_NUM_ATTRS_AMP		6
+#define CIRRUS_BD_NUM_ATTRS_AMP		7
 
 void cirrus_bd_store_values(const char *mfd_suffix);
 int cirrus_bd_amp_add(struct regmap *regmap_new, const char *mfd_suffix,
