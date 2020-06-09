@@ -47,6 +47,7 @@ struct cirrus_bd_t {
 	unsigned int max_exc[CIRRUS_MAX_AMPS];
 	unsigned int over_exc_count[CIRRUS_MAX_AMPS];
 	unsigned int max_temp[CIRRUS_MAX_AMPS];
+	unsigned int max_temp_keep[CIRRUS_MAX_AMPS];
 	unsigned int over_temp_count[CIRRUS_MAX_AMPS];
 	unsigned int abnm_mute[CIRRUS_MAX_AMPS];
 	unsigned long long int last_update;
@@ -130,6 +131,8 @@ void cirrus_bd_store_values(const char *mfd_suffix)
 	if (max_temp > cirrus_bd->max_temp[amp->index])
 		cirrus_bd->max_temp[amp->index] = max_temp;
 	cirrus_bd->abnm_mute[amp->index] += abnm_mute;
+
+	cirrus_bd->max_temp_keep[amp->index] = cirrus_bd->max_temp[amp->index];
 
 	cirrus_bd->last_update = ktime_to_ns(ktime_get());
 
@@ -260,6 +263,33 @@ static ssize_t cirrus_bd_max_temp_store(struct device *dev,
 	return 0;
 }
 
+static ssize_t cirrus_bd_max_temp_keep_show(struct device *dev,
+					struct device_attribute *attr,
+					char *buf)
+{
+	const char *suffix = &(attr->attr.name[strlen("max_temp_keep")]);
+	struct cirrus_mfd_amp *amp = cirrus_bd_get_amp_from_suffix(suffix);
+	int ret;
+
+	if (!amp)
+		return 0;
+
+	ret = sprintf(buf, "%d.%d\n",
+			cirrus_bd->max_temp_keep[amp->index] >> CS35L41_BD_TEMP_RADIX,
+			(cirrus_bd->max_temp_keep[amp->index] &
+			(((1 << CS35L41_BD_TEMP_RADIX) - 1))) *
+			10000 / (1 << CS35L41_BD_TEMP_RADIX));
+
+	return ret;
+}
+
+static ssize_t cirrus_bd_max_temp_keep_store(struct device *dev,
+					struct device_attribute *attr,
+					const char *buf, size_t size)
+{
+	return 0;
+}
+
 static ssize_t cirrus_bd_over_temp_count_show(struct device *dev,
 					struct device_attribute *attr,
 					char *buf)
@@ -357,6 +387,11 @@ static struct device_attribute generic_amp_attrs[CIRRUS_BD_NUM_ATTRS_AMP] = {
 	},
 	{
 		.attr = {.mode = VERIFY_OCTAL_PERMISSIONS(0444)},
+		.show = cirrus_bd_max_temp_keep_show,
+		.store = cirrus_bd_max_temp_keep_store,
+	},
+	{
+		.attr = {.mode = VERIFY_OCTAL_PERMISSIONS(0444)},
 		.show = cirrus_bd_over_temp_count_show,
 		.store = cirrus_bd_over_temp_count_store,
 	},
@@ -376,6 +411,7 @@ static const char *generic_amp_attr_names[CIRRUS_BD_NUM_ATTRS_AMP] = {
 	"max_exc",
 	"over_exc_count",
 	"max_temp",
+	"max_temp_keep",
 	"over_temp_count",
 	"abnm_mute",
 	"store"

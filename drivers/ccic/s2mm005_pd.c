@@ -28,6 +28,9 @@
 #include <linux/ccic/ccic_alternate.h>
 #endif
 
+#ifdef CONFIG_MUIC_SM5705_SWITCH_CONTROL_GPIO
+extern int muic_GPIO_control(int gpio);
+#endif
 struct pdic_notifier_struct pd_noti;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -245,6 +248,10 @@ void process_message_role(void *data)
 		return;
 	}
 		
+#ifdef CONFIG_MUIC_SM5705_SWITCH_CONTROL_GPIO
+	pr_info("%s call muic_GPIO_control(1) to keep usb path\n", __func__);
+	muic_GPIO_control(1);
+#endif
 	// 2. process power role
 	if (usbpd_data->func_state != State_PE_PRS_SNK_SRC_Source_on) {
 #if defined(CONFIG_DUAL_ROLE_USB_INTF)
@@ -301,7 +308,12 @@ void process_pd(void *data, u8 plug_attach_done, u8 *pdic_attach, MSG_IRQ_STATUS
 	REQUEST_FIXED_SUPPLY_STRUCT_Typedef *request_power_number;
 
 	pr_info("%s\n",__func__);
-	rp_currentlvl = ((usbpd_data->func_state >> 27) & 0x3);
+	
+	if (usbpd_data->short_detected)
+		rp_currentlvl = RP_CURRENT_ABNORMAL;
+	else
+		rp_currentlvl = ((usbpd_data->func_state >> 27) & 0x3);
+
 	is_src = (usbpd_data->func_state & (0x1 << 25) ? 1 : 0);
 	dev_info(&i2c->dev, "rp_currentlvl:0x%02X, is_source:0x%02X\n", rp_currentlvl, is_src);
 
@@ -385,6 +397,10 @@ void process_pd(void *data, u8 plug_attach_done, u8 *pdic_attach, MSG_IRQ_STATUS
 			} else if (rp_currentlvl == RP_CURRENT_LEVEL_DEFAULT) {
 				/* 5V/0.5A RP charger is detected by CCIC */
 				pd_noti.sink_status.rp_currentlvl = RP_CURRENT_LEVEL_DEFAULT;
+				pd_noti.event = PDIC_NOTIFY_EVENT_CCIC_ATTACH;
+			} else if (rp_currentlvl == RP_CURRENT_ABNORMAL) {
+				/* ABNORMAL RP charger is detected by CCIC */
+				pd_noti.sink_status.rp_currentlvl = RP_CURRENT_ABNORMAL;
 				pd_noti.event = PDIC_NOTIFY_EVENT_CCIC_ATTACH;
 			} else
 				return;

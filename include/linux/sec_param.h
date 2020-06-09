@@ -133,7 +133,7 @@ extern bool sec_get_param(enum sec_param_index index, void *value);
 extern bool sec_set_param(enum sec_param_index index, void *value);
 extern bool sales_code_is(char*);
 
-#define SEC_PARAM_FILE_SIZE	(0xA00000)	/* 10MB */
+#define SEC_PARAM_FILE_SIZE	(0xC00000)	/* 12MB */
 #define SEC_PARAM_FILE_OFFSET	(SEC_PARAM_FILE_SIZE - 0x100000)
 #define SECTOR_UNIT_SIZE	(4096)		/* UFS */
 

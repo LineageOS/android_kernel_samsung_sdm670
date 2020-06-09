@@ -41,6 +41,15 @@ __vfs_getxattr(struct dentry *dentry, struct inode *inode, const char *name,
 
 #endif
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 10, 17)
+/* Some linux headers are moved.
+ * Since Kernel 4.11 get_task_struct moved to sched/ folder.
+ */
+#include <linux/sched/task.h>
+#else
+#include <linux/sched.h>
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 21)
 /* d_backing_inode is absent on some Linux Kernel 3.x. but it back porting for
  * few Samsung kernels:
@@ -107,6 +116,32 @@ static inline u64 get_kimage_vaddr(void)
 static inline u64 get_kimage_voffset(void)
 {
 	return kimage_voffset;
+}
+#endif
+
+#ifndef OVERLAYFS_SUPER_MAGIC
+#define OVERLAYFS_SUPER_MAGIC 0x794c7630
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
+static inline struct dentry *d_real_comp(struct dentry *dentry)
+{
+	return d_real(dentry);
+}
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+static inline struct dentry *d_real_comp(struct dentry *dentry)
+{
+	return d_real(dentry, NULL, 0);
+}
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)
+static inline struct dentry *d_real_comp(struct dentry *dentry)
+{
+	return d_real(dentry, NULL, 0, 0);
+}
+#else
+static inline struct dentry *d_real_comp(struct dentry *dentry)
+{
+	return d_real(dentry, NULL);
 }
 #endif
 

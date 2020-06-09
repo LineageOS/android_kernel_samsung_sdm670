@@ -614,6 +614,19 @@ exit:
 	return rc;
 }
 
+#ifdef CONFIG_SEC_DISPLAYPORT
+static void secdp_parse_misc(struct dp_parser *parser)
+{
+	struct device *dev = &parser->pdev->dev;
+	int rc = 0;
+
+	rc = of_property_read_u32(dev->of_node, "secdp,rev_hw", &parser->rev_hw);
+	pr_debug("secdp,rev_hw: %d, rc: %d\n", parser->rev_hw, rc);
+
+	return;
+}
+#endif
+
 static int dp_parser_parse(struct dp_parser *parser)
 {
 	int rc = 0;
@@ -655,6 +668,9 @@ static int dp_parser_parse(struct dp_parser *parser)
 		goto err;
 
 	rc = dp_parser_msm_hdcp_dev(parser);
+#ifdef CONFIG_SEC_DISPLAYPORT
+	secdp_parse_misc(parser);
+#endif
 err:
 	return rc;
 }

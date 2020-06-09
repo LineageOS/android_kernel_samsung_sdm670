@@ -132,6 +132,10 @@ config WLAN_FEATURE_SARV1_TO_SARV2
 	bool "Enable conversion of SAR v1 to v2 feature"
 	default n
 
+config WLAN_BEACON_CHECK
+	bool "Enable Dynamic beacon and kickoff counter checker when grip power back off"
+	default n
+
 config WLAN_FEATURE_FILS
 	bool "Enable FILS Feature (11ai)"
 	default n

@@ -167,6 +167,7 @@ bool secdp_check_dex_mode(void);
 enum dex_support_res_t secdp_get_dex_res(void);
 
 void secdp_clear_link_status_update_cnt(struct dp_link *dp_link);
+void secdp_reset_link_status(struct dp_link *dp_link);
 bool secdp_check_link_stable(struct dp_link *dp_link);
 
 #ifdef SECDP_CALIBRATE_VXPX

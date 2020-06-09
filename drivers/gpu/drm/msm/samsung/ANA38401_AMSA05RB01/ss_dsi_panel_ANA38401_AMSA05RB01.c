@@ -340,6 +340,7 @@ static struct dsi_panel_cmd_set *ss_hbm_etc(struct samsung_display_driver_data *
 {
 	struct dsi_panel_cmd_set *hbm_etc_cmds = ss_get_cmds(vdd, TX_HBM_ETC);
 	int elvss_dim_off;
+	int elvss_comp;
 	int acl_opr;
 	int acl_start;
 	int acl_percent;
@@ -425,6 +426,13 @@ static struct dsi_panel_cmd_set *ss_hbm_etc(struct samsung_display_driver_data *
 	hbm_etc_cmds->cmds[8].msg.tx_buf[1] = acl_start;
 	hbm_etc_cmds->cmds[10].msg.tx_buf[1] = acl_percent;
 
+	if (vdd->dtsi_data.samsung_elvss_compensation) {
+		elvss_comp = hbm_etc_cmds->cmds[2].msg.tx_buf[1] + hbm_etc_cmds->cmds[4].msg.tx_buf[1];
+		
+		hbm_etc_cmds->cmds[2].msg.tx_buf[1] = 0x00;       /* B2h 0x70th */
+		hbm_etc_cmds->cmds[4].msg.tx_buf[1] = elvss_comp; /* B2h 0x67th */
+	}
+
 	LCD_INFO("bl:%d can:%d elv:%x temp:%d opr:%x start:%x acl:%x\n",
 			vdd->br.bl_level, vdd->br.cd_level,
 			elvss_dim_off, vdd->temperature, acl_opr, acl_start,
@@ -435,9 +443,15 @@ static struct dsi_panel_cmd_set *ss_hbm_etc(struct samsung_display_driver_data *
 
 static struct dsi_panel_cmd_set *ss_hbm_off(struct samsung_display_driver_data *vdd, int *level_key)
 {
+	struct dsi_panel_cmd_set *hbm_off_cmds = ss_get_cmds(vdd, TX_HBM_OFF);
+	
 	if (IS_ERR_OR_NULL(vdd)) {
 		LCD_ERR("Invalid data vdd : 0x%zx", (size_t)vdd);
 		return NULL;
+	}
+
+	if (vdd->dtsi_data.samsung_elvss_compensation) {
+		hbm_off_cmds->cmds[1].msg.tx_buf[1] = 0x00;
 	}
 
 	*level_key = LEVEL_KEY_NONE;
@@ -679,6 +693,27 @@ static struct dsi_panel_cmd_set *ss_acl_off(struct samsung_display_driver_data *
 	return ss_get_cmds(vdd, TX_ACL_OFF);
 }
 
+static int ss_elvss_read(struct samsung_display_driver_data *vdd)
+{
+	char elvss_read_CAL_OFFSET[1] = {0,};
+
+	if (IS_ERR_OR_NULL(vdd)) {
+		LCD_ERR("Invalid data vdd : 0x%zx", (size_t)vdd);
+		return false;
+	}
+
+	if (!vdd->dtsi_data.samsung_elvss_compensation) {
+		LCD_INFO("Not Supported \n");
+		return false;
+	}
+	
+	/* Read CAL_OFFSET[0x70] & Save to elvss_value2 */
+	ss_panel_data_read(vdd, RX_ELVSS, elvss_read_CAL_OFFSET, LEVEL_KEY_NONE);
+	vdd->br.elvss_value2 = elvss_read_CAL_OFFSET[0];
+
+	return true;
+}
+
 static struct dsi_panel_cmd_set *ss_pre_elvss(struct samsung_display_driver_data *vdd, int *level_key)
 {
 	if (IS_ERR_OR_NULL(vdd)) {
@@ -751,12 +786,41 @@ static struct dsi_panel_cmd_set *ss_elvss(struct samsung_display_driver_data *vd
 
 	elvss_cmd.cmds = &(elvss_cmds->cmds[cmd_idx]);
 	elvss_cmd.count = 1;
+
+	if (vdd->dtsi_data.samsung_elvss_compensation) {
+		/* Save elvss_value1 to send elvss2 cmd */
+		vdd->br.elvss_value1 = elvss_cmd.cmds[0].msg.tx_buf[1]; // 0x67 Value Save 
+	}
+	
 	*level_key = LEVEL_KEY_NONE;
 
 	return &elvss_cmd;
 end :
 	LCD_ERR("error");
 	return NULL;
+}
+
+static struct dsi_panel_cmd_set *ss_elvss_2(struct samsung_display_driver_data *vdd, int *level_key)
+{
+	struct dsi_panel_cmd_set *elvss_2_cmds = ss_get_cmds(vdd, TX_ELVSS_2);
+	int elvss_compensation = 0;
+
+	if (IS_ERR_OR_NULL(vdd) || IS_ERR_OR_NULL(elvss_2_cmds)) {
+		LCD_ERR("Invalid data vdd : 0x%zx cmds : 0x%zx", (size_t)vdd, (size_t)elvss_2_cmds);
+		return NULL;
+	}
+
+	if (!vdd->dtsi_data.samsung_elvss_compensation) {
+		LCD_INFO("Not Supported !\n");
+		return NULL;
+	}
+
+	elvss_compensation = vdd->br.elvss_value1 + vdd->br.elvss_value2;
+	elvss_2_cmds->cmds[1].msg.tx_buf[1] = elvss_compensation;
+	LCD_INFO("elvss_compensation [0x%x]+[0x%x]=[0x%x]\n", vdd->br.elvss_value1, vdd->br.elvss_value2, elvss_compensation);
+
+	*level_key = LEVEL_KEY_NONE;
+	return elvss_2_cmds;
 }
 
 static struct dsi_panel_cmd_set *ss_gamma(struct samsung_display_driver_data *vdd, int *level_key)
@@ -1416,7 +1480,7 @@ static void samsung_panel_init(struct samsung_display_driver_data *vdd)
 	vdd->panel_func.samsung_ddi_id_read = ss_ddi_id_read;
 	vdd->panel_func.samsung_cell_id_read = ss_cell_id_read;
 	vdd->panel_func.samsung_octa_id_read = NULL;
-	vdd->panel_func.samsung_elvss_read = NULL;
+	vdd->panel_func.samsung_elvss_read = ss_elvss_read;
 	vdd->panel_func.samsung_hbm_read = ss_hbm_read;
 	vdd->panel_func.samsung_mdnie_read = ss_mdnie_read;
 
@@ -1433,6 +1497,7 @@ static void samsung_panel_init(struct samsung_display_driver_data *vdd)
 	vdd->panel_func.samsung_brightness_acl_off = ss_acl_off;
 	vdd->panel_func.samsung_brightness_pre_elvss = ss_pre_elvss;
 	vdd->panel_func.samsung_brightness_elvss = ss_elvss;
+	vdd->panel_func.samsung_brightness_elvss_2 = ss_elvss_2;
 	vdd->panel_func.samsung_brightness_elvss_temperature1 = NULL;
 	vdd->panel_func.samsung_brightness_elvss_temperature2 = NULL;
 	vdd->panel_func.samsung_brightness_vint = NULL;

@@ -1123,6 +1123,7 @@ static int dwc3_probe(struct platform_device *pdev)
 
 	void __iomem		*regs;
 	void			*mem;
+	u8			usb3_lpm_capable = 1;
 
 	if (count >= DWC_CTRL_COUNT) {
 		dev_err(dev, "Err dwc instance %d >= %d available\n",
@@ -1236,8 +1237,10 @@ static int dwc3_probe(struct platform_device *pdev)
 	dwc->core_id = -1;
 	device_property_read_u32(dev, "usb-core-id", &dwc->core_id);
 
-	dwc->usb3_lpm_capable = device_property_read_bool(dev,
-				"snps,usb3_lpm_capable");
+	device_property_read_u8(dev, "snps,usb3_lpm_capable",
+				&usb3_lpm_capable);
+	dwc->usb3_lpm_capable = usb3_lpm_capable;
+	pr_info("%s : usb3_lpm_capable %d\n", __func__, dwc->usb3_lpm_capable);
 
 	dwc->needs_fifo_resize = device_property_read_bool(dev,
 				"tx-fifo-resize");

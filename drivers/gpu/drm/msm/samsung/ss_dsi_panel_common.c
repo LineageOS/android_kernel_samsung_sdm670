@@ -3062,6 +3062,10 @@ static void ss_panel_parse_dt(struct samsung_display_driver_data *vdd)
 		LCD_INFO("vdd->ddi_spi_cs_high_gpio_for_gpara = %d\n", vdd->ddi_spi_cs_high_gpio_for_gpara);
 	}
 
+	/* Elvss_compensation Support */
+	vdd->dtsi_data.samsung_elvss_compensation = of_property_read_bool(np, "samsung,elvss_compensation");
+	LCD_INFO("vdd->samsung_elvss_compensation: %s\n", vdd->dtsi_data.samsung_elvss_compensation ? "enabled" : "disabled");
+
 	/* Set elvss_interpolation_temperature */
 	data_32 = of_get_property(np, "samsung,elvss_interpolation_temperature", NULL);
 
@@ -4108,6 +4112,13 @@ static void set_hbm_br_values(struct samsung_display_driver_data *vdd)
 	if (vdd->br.bl_level > table->max_lv)
 		vdd->br.bl_level = table->max_lv;
 
+	if (vdd->dtsi_data.samsung_elvss_compensation) {
+		if (vdd->br.bl_level >= 317) {
+			LCD_INFO("Forced SET from [%d] to [317] \n", vdd->br.bl_level);
+			vdd->br.bl_level = 317;
+		}
+	}
+	
 	left = 0;
 	right = table->tab_size - 1;
 
@@ -4361,6 +4372,16 @@ static int ss_normal_brightness_packet_set(
 
 			level_key = false;
 			tx_cmd = vdd->panel_func.samsung_brightness_elvss(vdd, &level_key);
+
+			update_packet_level_key_enable(vdd, packet, &cmd_cnt, level_key);
+			ss_update_brightness_packet(packet, &cmd_cnt, tx_cmd);
+			update_packet_level_key_disable(vdd, packet, &cmd_cnt, level_key);
+		}
+
+		/* elvss 2nd (ex : elvss_compensation, ..) */
+		if (!IS_ERR_OR_NULL(vdd->panel_func.samsung_brightness_elvss_2)) {
+			level_key = false;
+			tx_cmd = vdd->panel_func.samsung_brightness_elvss_2(vdd, &level_key);
 
 			update_packet_level_key_enable(vdd, packet, &cmd_cnt, level_key);
 			ss_update_brightness_packet(packet, &cmd_cnt, tx_cmd);

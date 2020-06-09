@@ -71,10 +71,10 @@
 #include <net/tcp_states.h>
 #include <linux/net_tstamp.h>
 
-/* START_OF_KNOX_NPA */
+// KNOX NPA - START
 #define NAP_PROCESS_NAME_LEN	128
 #define NAP_DOMAIN_NAME_LEN	255
-/* END_OF_KNOX_NPA */
+// KNOX NPA - END
 
 /*
  * This structure really needs to be cleaned up.
@@ -445,16 +445,7 @@ struct sock {
 #endif
 	struct sock_cgroup_data	sk_cgrp_data;
 	struct mem_cgroup	*sk_memcg;
-	void			(*sk_state_change)(struct sock *sk);
-	void			(*sk_data_ready)(struct sock *sk);
-	void			(*sk_write_space)(struct sock *sk);
-	void			(*sk_error_report)(struct sock *sk);
-	int			(*sk_backlog_rcv)(struct sock *sk,
-						  struct sk_buff *skb);
-	void                    (*sk_destruct)(struct sock *sk);
-	struct sock_reuseport __rcu	*sk_reuseport_cb;
-	struct rcu_head		sk_rcu;
-	/* START_OF_KNOX_NPA */
+	// KNOX NPA - START
 	uid_t			knox_uid;
 	pid_t			knox_pid;
 	uid_t			knox_dns_uid;
@@ -465,7 +456,16 @@ struct sock {
 	char			parent_process_name[NAP_PROCESS_NAME_LEN];
 	pid_t			knox_dns_pid;
 	char 			dns_process_name[NAP_PROCESS_NAME_LEN];
-	/* END_OF_KNOX_NPA */
+	// KNOX NPA - END
+	void			(*sk_state_change)(struct sock *sk);
+	void			(*sk_data_ready)(struct sock *sk);
+	void			(*sk_write_space)(struct sock *sk);
+	void			(*sk_error_report)(struct sock *sk);
+	int			(*sk_backlog_rcv)(struct sock *sk,
+						  struct sk_buff *skb);
+	void                    (*sk_destruct)(struct sock *sk);
+	struct sock_reuseport __rcu	*sk_reuseport_cb;
+	struct rcu_head		sk_rcu;
 };
 
 #define __sk_user_data(sk) ((*((void __rcu **)&(sk)->sk_user_data)))
