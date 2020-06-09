@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "f05cd2c5_c5b78c8d",
+        "filename": "arch/arm64/configs/gts4lvwifi_defconfig",
+        "patchSetId": 1
+      },
+      "lineNbr": 753,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2020-06-09T11:17:12Z",
+      "side": 1,
+      "message": "I am not sure if we want to enable this thing.",
+      "range": {
+        "startLine": 753,
+        "startChar": 0,
+        "endLine": 753,
+        "endChar": 23
+      },
+      "revId": "414ff93237a7ad0ae739c604fd1d4b3d62df0e05",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
