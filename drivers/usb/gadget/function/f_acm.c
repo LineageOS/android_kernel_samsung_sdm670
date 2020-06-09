@@ -339,6 +339,8 @@ static void acm_complete_set_line_coding(struct usb_ep *ep,
 	}
 }
 
+static int acm_cdc_notify(struct f_acm *acm, u8 type, u16 value, void *data, unsigned length);
+
 static int acm_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 {
 	struct f_acm		*acm = func_to_acm(f);
@@ -398,6 +400,21 @@ static int acm_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 		notify_control_line_state((unsigned long)w_value);
 #endif
 		acm->port_handshake_bits = w_value;
+		spin_lock(&acm->lock);
+		if ((acm->port_handshake_bits & ACM_CTRL_DTR) && acm->pending) {
+			int	status;
+			__le16	serial_state;
+
+		if (acm->notify_req) {
+			serial_state = cpu_to_le16(acm->serial_state);
+			status = acm_cdc_notify(acm, USB_CDC_NOTIFY_SERIAL_STATE,
+				0, &serial_state, sizeof(acm->serial_state));
+			}
+		}
+		spin_unlock(&acm->lock);
+		pr_debug("%s: USB_CDC_REQ_SET_CONTROL_LINE_STATE: DTR:%d RST:%d\n",
+				__func__, w_value & ACM_CTRL_DTR ? 1 : 0,
+				w_value & ACM_CTRL_RTS ? 1 : 0);
 		break;
 
 	default:
@@ -542,10 +559,9 @@ static int acm_notify_serial_state(struct f_acm *acm)
 	struct usb_composite_dev *cdev = acm->port.func.config->cdev;
 	int			status;
 	__le16			serial_state;
-	unsigned long	flags;
 
-	spin_lock_irqsave(&acm->lock, flags);
-	if (acm->notify_req) {
+	spin_lock(&acm->lock);
+	if (acm->notify_req && (acm->port_handshake_bits & ACM_CTRL_DTR)) {
 		dev_dbg(&cdev->gadget->dev, "acm ttyGS%d serial state %04x\n",
 			acm->port_num, acm->serial_state);
 		serial_state = cpu_to_le16(acm->serial_state);
@@ -555,7 +571,7 @@ static int acm_notify_serial_state(struct f_acm *acm)
 		acm->pending = true;
 		status = 0;
 	}
-	spin_unlock_irqrestore(&acm->lock, flags);
+	spin_unlock(&acm->lock);
 	return status;
 }
 
@@ -563,16 +579,15 @@ static void acm_cdc_notify_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	struct f_acm		*acm = req->context;
 	u8			doit = false;
-   	unsigned long	flags;
 
 	/* on this call path we do NOT hold the port spinlock,
 	 * which is why ACM needs its own spinlock
 	 */
-	spin_lock_irqsave(&acm->lock, flags);
+	spin_lock(&acm->lock);
 	if (req->status != -ESHUTDOWN)
 		doit = acm->pending;
 	acm->notify_req = req;
-	spin_unlock_irqrestore(&acm->lock, flags);
+	spin_unlock(&acm->lock);
 
 	if (doit)
 		acm_notify_serial_state(acm);

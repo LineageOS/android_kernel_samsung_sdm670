@@ -366,6 +366,7 @@ enum dsi_cmd_set_type {
 	TX_ACL_ON,
 	TX_ACL_OFF,
 	TX_ELVSS,
+	TX_ELVSS_2,
 	TX_ELVSS_HIGH,
 	TX_ELVSS_MID,
 	TX_ELVSS_LOW,

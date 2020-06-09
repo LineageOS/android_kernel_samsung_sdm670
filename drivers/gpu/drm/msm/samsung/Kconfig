@@ -174,3 +174,10 @@ config PANEL_ANA38401_AMSA05RB01_WQXGA
 	default n
 	---help---
 	LSI ANA38401 LDI 2560_1600 TAB S4 LV
+
+config PLL_SSC_DISABLED
+	depends on DISPLAY_SAMSUNG
+	bool "PLL_SSC_DISABLED"
+	default n
+	---help---
+	PLL_SSC_DISABLED

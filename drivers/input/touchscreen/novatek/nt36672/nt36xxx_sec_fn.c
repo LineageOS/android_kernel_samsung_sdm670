@@ -1191,6 +1191,14 @@ static void fw_update(void *device_data)
 		ret = nvt_ts_fw_update_from_bin(ts);
 		break;
 	case UMS:
+#ifdef CONFIG_SAMSUNG_PRODUCT_SHIP
+	snprintf(buff, sizeof(buff), "%s", "OK");
+	sec_cmd_set_cmd_result(sec, buff, strnlen(buff, sizeof(buff)));
+	sec->cmd_state = SEC_CMD_STATUS_OK;
+	input_info(true, &ts->client->dev, "%s: %s\n", __func__, buff);
+	return;
+#endif
+
 		ret = nvt_ts_fw_update_from_ums(ts);
 		break;
 	default:

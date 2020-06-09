@@ -44,7 +44,11 @@
 #if defined(CONFIG_SEC_A8SQLTE_PROJECT)
 #define REAR_MODULE_FW_VERSION                  0x0048
 #else
+#if defined(CONFIG_SEC_GTACTIVEXL_PROJECT)
+#define REAR_MODULE_FW_VERSION                  0x005E
+#else
 #define REAR_MODULE_FW_VERSION                  0x0030
+#endif
 #endif
 
 #if defined(CONFIG_SAMSUNG_MULTI_CAMERA)
@@ -55,12 +59,22 @@
 #define FROM_MODULE_FW_INFO_SIZE                11
 #define FROM_REAR_HEADER_SIZE                   0x0100
 
+#if defined(CONFIG_SEC_GTACTIVEXL_PROJECT)
+#define REAR_CAL_VERSION_ADDR                   0x0090
+#else
 #define REAR_CAL_VERSION_ADDR                   0x10F0
+#endif
+
 #define REAR3_CAL_VERSION_ADDR                  0x08F0
 #define FRONT_CAL_VERSION_ADDR                  0x0876
 #define REAR2_CAL_VERSION_ADDR                  0x00E0
 
+#if defined(CONFIG_SEC_A8SQLTE_PROJECT)
+#define FRONT_CAM_MAP_VERSION_ADDR              0x0073
+#else
 #define FRONT_CAM_MAP_VERSION_ADDR              0x0070
+#endif
+
 #define REAR_CAM_MAP_VERSION_ADDR               0x00E3
 #define REAR3_CAM_MAP_VERSION_ADDR		0x00E3
 #define REAR2_CAM_MAP_VERSION_ADDR		0x00D8
@@ -68,7 +82,11 @@
 #if defined(CONFIG_SEC_A8SQLTE_PROJECT)
 #define REAR_DLL_VERSION_ADDR                   0x00E7
 #else
+#if defined(CONFIG_SEC_GTACTIVEXL_PROJECT)
+#define REAR_DLL_VERSION_ADDR                   0x0094
+#else
 #define REAR_DLL_VERSION_ADDR                   0x006F
+#endif
 #endif
 
 #if defined(CONFIG_SAMSUNG_MULTI_CAMERA)
@@ -193,21 +211,32 @@
 #define MODULE_VER_ON_SRA                       0x4D
 #define FRONT_MODULE_VER_ON_PVR                 0x72
 #define FRONT_MODULE_VER_ON_SRA                 0x78
+
 #if defined(CONFIG_SAMSUNG_MULTI_CAMERA)
 #if defined(CONFIG_SEC_A8SQLTE_PROJECT)
 #define CAMERA_CAL_CRC                          0x3F
-#define CAMERA_CAL_CRC_TELE			0x1F
-#define CAMERA_CAL_CRC_DEPTH 			0x00
+#define CAMERA_CAL_CRC_TELE                     0x1F
+#define CAMERA_CAL_CRC_DEPTH                    0x00
+#else
+#if defined(CONFIG_SEC_GTACTIVEXL_PROJECT)
+#define CAMERA_CAL_CRC                          0x3F
+#define CAMERA_CAL_CRC_TELE                     0x1F
+#define CAMERA_CAL_CRC_DEPTH                    0x00
 #else
 #define CAMERA_CAL_CRC                          0x11
-#define CAMERA_CAL_CRC_TELE			0x1F
-#define CAMERA_CAL_CRC_DEPTH 			0x00
+#define CAMERA_CAL_CRC_TELE                     0x1F
+#define CAMERA_CAL_CRC_DEPTH                    0x00
+#endif
 #endif
 #else
 #if defined(CONFIG_SEC_A8SQLTE_PROJECT)
 #define CAMERA_CAL_CRC                          0x3FFF
 #else
+#if defined(CONFIG_SEC_GTACTIVEXL_PROJECT)
+#define CAMERA_CAL_CRC                          0x3F
+#else
 #define CAMERA_CAL_CRC                          0x11
+#endif
 #endif
 #endif
 
@@ -217,7 +246,12 @@
 #define CAMERA_CAL_CRC_WIDE                     0x11
 #endif
 
+#if defined(CONFIG_SEC_A8SQLTE_PROJECT)
+#define CAMERA_CAL_CRC_FRONT                    0x2E
+#else
 #define CAMERA_CAL_CRC_FRONT                    0x3F
+#endif
+
 #define REAR_PAF_CAL_INFO_SIZE                  1024
 
 extern uint32_t front_af_cal_pan;
@@ -306,12 +340,24 @@ extern char module_info[SYSFS_MODULE_INFO_SIZE];
 #define PROCESS_INFO                            ("A")
 #define CRITERION_REV                           (10)
 #else
-	
 #if defined(CONFIG_SEC_A8SQLTE_PROJECT)
 #define HW_INFO                                 ("G24QS")
 #define SW_INFO                                 ("LH00")
 #define VENDOR_INFO                             ("S")
 #define PROCESS_INFO                            ("A")
+#define CRITERION_REV                           (0)
+#else
+#if defined(CONFIG_SEC_GTACTIVEXL_PROJECT)
+#define HW_INFO                                 ("G13QL")
+#define SW_INFO                                 ("MD00")
+#define VENDOR_INFO                             ("M")
+#define PROCESS_INFO                            ("A")
+#define CRITERION_REV                           (0)
+#elif defined(CONFIG_SEC_GTS4LV_PROJECT)
+#define HW_INFO                                 ("U13QL")
+#define SW_INFO                                 ("LA00")
+#define VENDOR_INFO                             ("N")
+#define PROCESS_INFO                            ("M")
 #define CRITERION_REV                           (0)
 #else
 #define HW_INFO                                 ("U13QL")
@@ -320,7 +366,7 @@ extern char module_info[SYSFS_MODULE_INFO_SIZE];
 #define PROCESS_INFO                            ("A")
 #define CRITERION_REV                           (0)
 #endif
-
+#endif
 #define HW_INFO_TELE                            ("D13QL")
 #define SW_INFO_TELE                            ("LH00")
 #define VENDOR_INFO_TELE                        ("S")
@@ -340,10 +386,22 @@ extern char module_info[SYSFS_MODULE_INFO_SIZE];
 #define PROCESS_INFO                            ("A")
 #define CRITERION_REV                           (14)
 #endif
+#if defined(CONFIG_SEC_A8SQLTE_PROJECT)
+#define FRONT_HW_INFO                           ("E24QS")
+#define FRONT_SW_INFO                           ("LA00")
+#define FRONT_VENDOR_INFO                       ("Y")
+#define FRONT_PROCESS_INFO                      ("A")
+#elif defined(CONFIG_SEC_GTS4LV_PROJECT)
+#define FRONT_HW_INFO                           ("Z08QL")
+#define FRONT_SW_INFO                           ("LA00")
+#define FRONT_VENDOR_INFO                       ("N")
+#define FRONT_PROCESS_INFO                      ("M")
+#else
 #define FRONT_HW_INFO                           ("Z08QL")
 #define FRONT_SW_INFO                           ("LA00")
 #define FRONT_VENDOR_INFO                       ("N")
 #define FRONT_PROCESS_INFO                      ("A")
+#endif
 
 /**
  * struct cam_eeprom_map_t - eeprom map
