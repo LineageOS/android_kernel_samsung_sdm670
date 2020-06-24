@@ -1098,7 +1098,7 @@ static int handle_uaudio_stream_req(void *req_h, void *req)
 	mutex_unlock(&chip->dev_lock);
 
 response:
-	if (!req_msg->enable && (ret != -EINVAL || ret != -ENODEV)) {
+	if (!req_msg->enable && ret != -EINVAL && ret != -ENODEV) {
 		mutex_lock(&chip->dev_lock);
 		if (info_idx >= 0) {
 			info = &uadev[pcm_card_num].info[info_idx];
