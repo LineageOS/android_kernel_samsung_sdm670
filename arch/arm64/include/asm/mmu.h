@@ -37,8 +37,14 @@ typedef struct {
 
 static inline bool arm64_kernel_unmapped_at_el0(void)
 {
+#ifdef CONFIG_UH_RKP
+	/* We here assume the model having CONFIG_UNMAP_KERNEL_AT_EL0 uses KPTI.
+	   All ptes of kernel page table have to get nG bit in map_kernel. */
+	return IS_ENABLED(CONFIG_UNMAP_KERNEL_AT_EL0);
+#else
 	return IS_ENABLED(CONFIG_UNMAP_KERNEL_AT_EL0) &&
 	       cpus_have_const_cap(ARM64_UNMAP_KERNEL_AT_EL0);
+#endif
 }
 
 typedef void (*bp_hardening_cb_t)(void);

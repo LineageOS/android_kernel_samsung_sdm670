@@ -177,6 +177,12 @@ struct dp_parser {
 	u8 l_map[4];
 	struct dp_aux_cfg aux_cfg[AUX_CFG_LEN];
 	u32 max_pclk_khz;
+#ifdef CONFIG_SEC_DISPLAYPORT
+	u32 rev_hw;
+	bool aux_sw;		/* true if AUX switch IC is located */
+	bool aux_redrv;		/* true if Redriver IC is located */
+	bool prefer_res;	/* true if prefer resolution has high priority */
+#endif
 
 	int (*parse)(struct dp_parser *parser);
 	struct dp_io_data *(*get_io)(struct dp_parser *parser, char *name);
