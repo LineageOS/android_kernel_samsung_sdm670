@@ -445,6 +445,10 @@ static void dsi_pll_setup_config(struct dsi_pll_10nm *pll,
 	config->enable_ssc = rsc->ssc_en;
 	config->ssc_center = rsc->ssc_center;
 
+#if defined(CONFIG_PLL_SSC_DISABLED)
+	config->enable_ssc = false;
+#endif
+
 	if (config->enable_ssc) {
 		if (rsc->ssc_freq)
 			config->ssc_freq = rsc->ssc_freq;
