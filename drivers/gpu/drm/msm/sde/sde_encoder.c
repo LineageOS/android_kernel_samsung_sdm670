@@ -39,6 +39,11 @@
 #include "sde_trace.h"
 #include "sde_core_irq.h"
 
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+#include <linux/interrupt.h>
+#include "ss_dsi_panel_common.h"
+#endif
+
 #define SDE_DEBUG_ENC(e, fmt, ...) SDE_DEBUG("enc%d " fmt,\
 		(e) ? (e)->base.base.id : -1, ##__VA_ARGS__)
 
@@ -2507,6 +2512,8 @@ static void sde_encoder_virt_mode_set(struct drm_encoder *drm_enc,
 	struct sde_rm_hw_iter dsc_iter, pp_iter;
 	int i = 0, ret;
 
+	SDE_ERROR("sde_encoder_virt_mode_set ++ \n");
+
 	if (!drm_enc) {
 		SDE_ERROR("invalid encoder\n");
 		return;
@@ -2609,6 +2616,8 @@ static void sde_encoder_virt_mode_set(struct drm_encoder *drm_enc,
 	for (i = 0; i < sde_enc->num_phys_encs; i++) {
 		struct sde_encoder_phys *phys = sde_enc->phys_encs[i];
 
+		SDE_ERROR("sde_encoder_virt_mode_set : sde_enc->num_phys_encs (%d), i = (%d)\n", sde_enc->num_phys_encs, i );
+
 		if (phys) {
 			if (!sde_enc->hw_pp[i]) {
 				SDE_ERROR_ENC(sde_enc,
@@ -2619,6 +2628,8 @@ static void sde_encoder_virt_mode_set(struct drm_encoder *drm_enc,
 			phys->connector = conn->state->connector;
 			if (phys->ops.mode_set)
 				phys->ops.mode_set(phys, mode, adj_mode);
+
+			SDE_ERROR_ENC(sde_enc, "OK : i (%d)\n", i );
 		}
 	}
 
@@ -2626,6 +2637,8 @@ static void sde_encoder_virt_mode_set(struct drm_encoder *drm_enc,
 	if (msm_is_mode_seamless_dms(adj_mode))
 		sde_encoder_resource_control(&sde_enc->base,
 						SDE_ENC_RC_EVENT_POST_MODESET);
+
+	SDE_ERROR("sde_encoder_virt_mode_set -- \n");
 }
 
 void sde_encoder_control_te(struct drm_encoder *drm_enc, bool enable)
@@ -2826,7 +2839,7 @@ void sde_encoder_virt_restore(struct drm_encoder *drm_enc)
 static void sde_encoder_off_work(struct kthread_work *work)
 {
 	struct sde_encoder_virt *sde_enc = container_of(work,
-			struct sde_encoder_virt, delayed_off_work.work);
+		struct sde_encoder_virt, delayed_off_work.work);
 	struct drm_encoder *drm_enc;
 
 	if (!sde_enc) {
@@ -4023,6 +4036,60 @@ int sde_encoder_poll_line_counts(struct drm_encoder *drm_enc)
 	SDE_EVT32(DRMID(drm_enc), line_count, SDE_EVTLOG_ERROR);
 	return -ETIMEDOUT;
 }
+
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+#include <drm/drm_encoder.h>
+int ss_get_vdd_ndx_from_state(struct drm_atomic_state *old_state)
+{
+	struct drm_crtc *crtc;
+	struct drm_crtc_state *old_crtc_state;
+	int i;
+
+	struct drm_encoder *encoder;
+	struct drm_device *dev;
+
+	struct sde_encoder_virt *sde_enc = NULL;
+	struct sde_encoder_phys *phys;
+
+	struct sde_connector *c_conn;
+	struct dsi_display *display;
+	struct samsung_display_driver_data *vdd;
+	int ndx = -EINVAL;
+
+
+	for_each_crtc_in_state(old_state, crtc, old_crtc_state, i) {
+		if (crtc->state->active) {
+			dev = crtc->dev;
+			list_for_each_entry(encoder, &dev->mode_config.encoder_list, head) {
+				if (encoder->crtc == crtc)
+					sde_enc = to_sde_encoder_virt(encoder);
+			}
+		}
+	}
+
+	if (!sde_enc)
+		return -ENODEV;
+
+	/* TOOD: remove below W/A and debug why panic occurs in video mode (DP) or writeback case */
+	if (sde_enc->disp_info.intf_type != DRM_MODE_CONNECTOR_DSI)
+		return PRIMARY_DISPLAY_NDX;
+
+
+
+	for (i = 0; i < sde_enc->num_phys_encs; i++) {
+		phys = sde_enc->phys_encs[i];
+		if (phys) {
+			c_conn = to_sde_connector(phys->connector);
+			display = c_conn->display;
+			vdd = display->panel->panel_private;
+
+			ndx = vdd->ndx;
+		}
+	}
+
+	return ndx;
+}
+#endif
 
 int sde_encoder_prepare_for_kickoff(struct drm_encoder *drm_enc,
 		struct sde_encoder_kickoff_params *params)

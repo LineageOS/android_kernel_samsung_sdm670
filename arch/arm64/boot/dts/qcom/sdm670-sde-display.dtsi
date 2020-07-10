@@ -129,7 +129,7 @@
 			qcom,supply-disable-load = <80>;
 		};
 	};
-
+#if 0
 	dsi_dual_nt35597_truly_video_display: qcom,dsi-display@0 {
 		compatible = "qcom,dsi-display";
 		label = "dsi_dual_nt35597_truly_video_display";
@@ -551,6 +551,7 @@
 		};
 	};
 
+
 	dsi_sharp_1080_cmd_display: qcom,dsi-display@19 {
 		compatible = "qcom,dsi-display";
 		label = "dsi_sharp_1080_cmd_display";
@@ -600,6 +601,7 @@
 	};
 
 
+#endif
 	sde_wb: qcom,wb-display@0 {
 		compatible = "qcom,wb-display";
 		cell-index = <0>;
@@ -628,9 +630,9 @@
 };
 
 &mdss_mdp {
-	connectors = <&sde_rscc &sde_wb &sde_dp>;
+	connectors = <&sde_rscc &sde_wb /*&sde_dp*/>;
 };
-
+#if 0
 &dsi_dual_nt35597_truly_video {
 	qcom,mdss-dsi-t-clk-post = <0x0D>;
 	qcom,mdss-dsi-t-clk-pre = <0x2D>;
@@ -1048,3 +1050,4 @@
 		};
 	};
 };
+#endif
