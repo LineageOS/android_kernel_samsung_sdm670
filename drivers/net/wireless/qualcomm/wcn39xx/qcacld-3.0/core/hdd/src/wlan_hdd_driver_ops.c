@@ -154,7 +154,7 @@ static void hdd_hif_init_driver_state_callbacks(void *data,
  *
  * Return: None
  */
-#ifdef QCS403_MEM_OPTIMIZE
+#ifdef SLUB_MEM_OPTIMIZE
 static void hdd_hif_set_attribute(struct hif_opaque_softc *hif_ctx)
 {
 	hif_set_attribute(hif_ctx, HIF_LOWDESC_CE_NO_PKTLOG_CFG);
@@ -569,7 +569,7 @@ static void hdd_send_hang_reason(void)
 	enum qdf_hang_reason reason = QDF_REASON_UNSPECIFIED;
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 
-	if (wlan_hdd_validate_context(hdd_ctx))
+	if (!hdd_ctx)
 		return;
 
 	cds_get_recovery_reason(&reason);
