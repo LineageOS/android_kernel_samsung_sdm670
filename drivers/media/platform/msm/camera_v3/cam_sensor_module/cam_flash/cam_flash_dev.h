@@ -21,7 +21,6 @@
 #include <linux/of.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/leds-qpnp-flash.h>
 #include <media/v4l2-subdev.h>
 #include <media/v4l2-ioctl.h>
 #include <media/v4l2-event.h>
@@ -36,7 +35,6 @@
 #include "cam_debug_util.h"
 #include "cam_sensor_io.h"
 #include "cam_flash_core.h"
-#include "cam_context.h"
 
 #define CAMX_FLASH_DEV_NAME "cam-flash-dev"
 
@@ -137,7 +135,6 @@ struct cam_flash_frame_setting {
  * @torch_trigger_name  : Torch trigger name array
  * @torch_op_current    : Torch operational current
  * @torch_max_current   : Max supported current for LED in torch mode
- * @is_wled_flash       : Detection between WLED/LED flash
  */
 
 struct cam_flash_private_soc {
@@ -149,7 +146,6 @@ struct cam_flash_private_soc {
 	const char   *torch_trigger_name[CAM_FLASH_MAX_LED_TRIGGERS];
 	uint32_t     torch_op_current[CAM_FLASH_MAX_LED_TRIGGERS];
 	uint32_t     torch_max_current[CAM_FLASH_MAX_LED_TRIGGERS];
-	bool         is_wled_flash;
 };
 
 struct cam_flash_func_tbl {
@@ -162,7 +158,6 @@ struct cam_flash_func_tbl {
 
 /**
  *  struct cam_flash_ctrl
- * @device_name         : Device name
  * @soc_info            : Soc related information
  * @pdev                : Platform device
  * @per_frame[]         : Per_frame setting array
@@ -188,7 +183,6 @@ struct cam_flash_func_tbl {
  * @last_flush_req      : last request to flush
  */
 struct cam_flash_ctrl {
-	char device_name[CAM_CTX_DEV_NAME_MAX_LENGTH];
 	struct cam_hw_soc_info              soc_info;
 	struct platform_device             *pdev;
 	struct cam_sensor_power_ctrl_t      power_info;
