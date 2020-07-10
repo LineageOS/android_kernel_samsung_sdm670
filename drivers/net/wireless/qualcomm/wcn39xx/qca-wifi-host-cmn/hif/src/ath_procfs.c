@@ -206,7 +206,11 @@ int athdiag_procfs_init(void *scn)
 		return -ENOMEM;
 	}
 
+#ifdef CONFIG_SEC
+	proc_file = proc_create_data(PROCFS_NAME, 0666, proc_dir,
+#else
 	proc_file = proc_create_data(PROCFS_NAME, 0600, proc_dir,
+#endif /* CONFIG_SEC */
 				     &athdiag_fops, (void *)scn);
 	if (proc_file == NULL) {
 		remove_proc_entry(PROCFS_NAME, proc_dir);

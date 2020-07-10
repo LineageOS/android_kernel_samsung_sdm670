@@ -45,6 +45,10 @@
 #include "thermal_core.h"
 #include "thermal_hwmon.h"
 
+#ifdef CONFIG_SEC_PM
+void *thermal_ipc_log;
+#endif
+
 MODULE_AUTHOR("Zhang Rui");
 MODULE_DESCRIPTION("Generic thermal management sysfs support");
 MODULE_LICENSE("GPL v2");
@@ -2668,6 +2672,14 @@ static int __init thermal_init(void)
 	if (result)
 		pr_warn("Thermal: Can not register suspend notifier, return %d\n",
 			result);
+
+#ifdef CONFIG_SEC_PM
+	if (!thermal_ipc_log)
+		thermal_ipc_log = ipc_log_context_create(10, "lmh_dcvs", 0);
+
+	if (!thermal_ipc_log)
+		pr_err("%s: Failed to create thermal logging context\n", __func__);
+#endif
 
 	return 0;
 
