@@ -235,6 +235,9 @@ static void dsi_phy_hw_v3_0_lane_settings(struct dsi_phy_hw *phy,
 		DSI_W32(phy, DSIPHY_LNX_OFFSET_TOP_CTRL(i), 0x0);
 		DSI_W32(phy, DSIPHY_LNX_OFFSET_BOT_CTRL(i), 0x0);
 		DSI_W32(phy, DSIPHY_LNX_TX_DCTRL(i), tx_dctrl[i]);
+
+		pr_debug("%s: [%d] %x %x %x \n", __func__, i,
+			cfg->lanecfg.lane[i][0], cfg->lanecfg.lane[i][1], cfg->lanecfg.lane[i][2]);
 	}
 }
 
@@ -278,6 +281,7 @@ void dsi_phy_hw_v3_0_enable(struct dsi_phy_hw *phy,
 	u32 const timeout_us = 1000;
 	struct dsi_phy_per_lane_cfgs *timing = &cfg->timing;
 	u32 data;
+//	int i = 0;
 
 	if (dsi_phy_hw_v3_0_is_pll_on(phy))
 		pr_warn("PLL turned on before configuring PHY\n");
@@ -348,7 +352,11 @@ void dsi_phy_hw_v3_0_enable(struct dsi_phy_hw *phy,
 		break;
 	}
 	DSI_W32(phy, DSIPHY_CMN_CLK_CFG1, (data << 2)); /* set PLL src */
-
+#if 0
+	for (i=0; i<14; i++) {
+		pr_err("%s: [%d] %x\n", __func__, i, timing->lane_v3[i]);
+	}
+#endif
 	/* DSI lane settings */
 	dsi_phy_hw_v3_0_lane_settings(phy, cfg);
 
@@ -536,8 +544,11 @@ int dsi_phy_hw_timing_val_v3_0(struct dsi_phy_per_lane_cfgs *timing_cfg,
 		return -EINVAL;
 	}
 
-	for (i = 0; i < size; i++)
+	for (i = 0; i < size; i++){
 		timing_cfg->lane_v3[i] = timing_val[i];
+
+		pr_debug("%s : [%d] %x \n", __func__, i, timing_val[i]);
+	}
 	return 0;
 }
 

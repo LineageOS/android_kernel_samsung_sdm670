@@ -60,7 +60,7 @@ jiffies = jiffies_64;
 #define TRAMP_TEXT					\
 	. = ALIGN(PAGE_SIZE);				\
 	VMLINUX_SYMBOL(__entry_tramp_text_start) = .;	\
-	KEEP(*(.entry.tramp.text))			\
+	*(.entry.tramp.text)				\
 	. = ALIGN(PAGE_SIZE);				\
 	VMLINUX_SYMBOL(__entry_tramp_text_end) = .;
 #else
@@ -149,6 +149,38 @@ SECTIONS
 	. = ALIGN(SEGMENT_ALIGN);
 	_etext = .;			/* End of text section */
 
+#ifdef CONFIG_UH_RKP
+	. = ALIGN(PAGE_SIZE);
+	.rkp.bitmap : {
+		rkp_pgt_bitmap = .;
+		*(.rkp.bitmap)
+	}
+	. = ALIGN(PAGE_SIZE);
+	.rkp.dblmap : {
+		rkp_map_bitmap = .;
+		*(.rkp.dblmap)
+	}
+#ifdef CONFIG_RKP_KDP
+	 /* Creating a new section to store task credentials */
+	. = ALIGN(PAGE_SIZE);
+	.rkp.prot.page : {
+		__rkp_ro_start = .;
+	}
+	. = __rkp_ro_start + 0x4000;
+	. = ALIGN(PAGE_SIZE);
+#endif /* CONFIG_RKP_KDP*/
+
+	. = ALIGN(PAGE_SIZE);
+	bm_pte = .;
+	. += PAGE_SIZE;
+	. = ALIGN(PAGE_SIZE);
+	bm_pmd = .;
+	. += PAGE_SIZE;
+	. = ALIGN(PAGE_SIZE);
+	bm_pud = .;
+	. += PAGE_SIZE;
+#endif
+
 	RO_DATA(PAGE_SIZE)		/* everything from this point to     */
 	EXCEPTION_TABLE(8)		/* __init_begin will be marked RO NX */
 	NOTES
@@ -179,11 +211,11 @@ SECTIONS
 	. = ALIGN(4);
 	.altinstructions : {
 		__alt_instructions = .;
-		KEEP(*(.altinstructions))
+		*(.altinstructions)
 		__alt_instructions_end = .;
 	}
 	.altinstr_replacement : {
-		KEEP(*(.altinstr_replacement))
+		*(.altinstr_replacement)
 	}
 	.rela : ALIGN(8) {
 		*(.rela .rela*)

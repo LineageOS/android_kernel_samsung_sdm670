@@ -24,7 +24,6 @@
 #include <linux/hid.h>
 #include <linux/module.h>
 #include <linux/uio.h>
-#include <linux/ipc_logging.h>
 #include <asm/unaligned.h>
 
 #include <linux/usb/composite.h>
@@ -42,6 +41,9 @@
 
 #define FUNCTIONFS_MAGIC	0xa647361 /* Chosen by a honest dice roll ;) */
 
+#ifdef CONFIG_USB_FFS_IPC_LOGGING
+#include <linux/ipc_logging.h>
+
 #define NUM_PAGES	10 /* # of pages for ipc logging */
 
 static void *ffs_ipc_log;
@@ -50,6 +52,9 @@ static void *ffs_ipc_log;
 			##__VA_ARGS__); \
 	pr_debug("%s: " fmt, __func__, ##__VA_ARGS__); \
 } while (0)
+#else
+#define ffs_log(fmt, ...) do { } while (0)
+#endif
 
 /* Reference counter handling */
 static void ffs_data_get(struct ffs_data *ffs);
@@ -1841,11 +1846,12 @@ static int functionfs_init(void)
 		pr_info("file system registered\n");
 	else
 		pr_err("failed registering file system (%d)\n", ret);
-
+#ifdef CONFIG_USB_FFS_IPC_LOGGING
 	ffs_ipc_log = ipc_log_context_create(NUM_PAGES, "f_fs", 0);
 	if (IS_ERR_OR_NULL(ffs_ipc_log))
 		ffs_ipc_log =  NULL;
 
+#endif
 	return ret;
 }
 
@@ -1855,11 +1861,12 @@ static void functionfs_cleanup(void)
 
 	pr_info("unloading\n");
 	unregister_filesystem(&ffs_fs_type);
-
+#ifdef CONFIG_USB_FFS_IPC_LOGGING
 	if (ffs_ipc_log) {
 		ipc_log_context_destroy(ffs_ipc_log);
 		ffs_ipc_log = NULL;
 	}
+#endif
 }
 
 
