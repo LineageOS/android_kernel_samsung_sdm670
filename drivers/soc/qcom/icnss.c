@@ -323,6 +323,9 @@ static struct icnss_vreg_info icnss_vreg_info[] = {
 	{NULL, "vdd-1.8-xo", 1800000, 1800000, 0, 0, false},
 	{NULL, "vdd-1.3-rfa", 1304000, 1304000, 0, 0, false},
 	{NULL, "vdd-3.3-ch0", 3312000, 3312000, 0, 0, false},
+#if defined(CONFIG_SEC_GTS4LV_PROJECT)
+	{NULL, "vdd-3.3", 3312000, 3312000, 0, 0, false},
+#endif
 };
 
 #define ICNSS_VREG_INFO_SIZE		ARRAY_SIZE(icnss_vreg_info)
@@ -1402,7 +1405,7 @@ static int wlfw_msa_mem_info_send_sync_msg(void)
 	for (i = 0; i < resp.mem_region_info_len; i++) {
 
 		if (resp.mem_region_info[i].size > penv->msa_mem_size ||
-		    resp.mem_region_info[i].region_addr > max_mapped_addr ||
+		    resp.mem_region_info[i].region_addr >= max_mapped_addr ||
 		    resp.mem_region_info[i].region_addr < penv->msa_pa ||
 		    resp.mem_region_info[i].size +
 		    resp.mem_region_info[i].region_addr > max_mapped_addr) {
@@ -1426,6 +1429,7 @@ static int wlfw_msa_mem_info_send_sync_msg(void)
 	}
 
 	return 0;
+	
 
 fail_unwind:
 	memset(&penv->mem_region[0], 0, sizeof(penv->mem_region[0]) * i);
@@ -2331,6 +2335,7 @@ static int icnss_call_driver_probe(struct icnss_priv *priv)
 
 	icnss_block_shutdown(false);
 	set_bit(ICNSS_DRIVER_PROBED, &priv->state);
+	icnss_block_shutdown(false);
 
 	return 0;
 
@@ -2595,7 +2600,6 @@ static int icnss_driver_event_register_driver(void *data)
 	}
 
 	icnss_block_shutdown(false);
-	set_bit(ICNSS_DRIVER_PROBED, &penv->state);
 
 	return 0;
 
@@ -5019,6 +5023,7 @@ static int icnss_probe(struct platform_device *pdev)
 			     ret);
 
 	penv = priv;
+	
 
 	init_completion(&priv->unblock_shutdown);
 
@@ -5043,6 +5048,7 @@ static int icnss_remove(struct platform_device *pdev)
 	device_init_wakeup(&penv->pdev->dev, false);
 
 	icnss_debugfs_destroy(penv);
+	
 
 	complete_all(&penv->unblock_shutdown);
 

@@ -2615,7 +2615,8 @@ int snd_soc_dai_digital_mute(struct snd_soc_dai *dai, int mute,
 
 	if (dai->driver->ops->mute_stream)
 		return dai->driver->ops->mute_stream(dai, mute, direction);
-	else if (dai->driver->ops->digital_mute)
+	else if (direction == SNDRV_PCM_STREAM_PLAYBACK &&
+		dai->driver->ops->digital_mute)
 		return dai->driver->ops->digital_mute(dai, mute);
 	else
 		return -ENOTSUPP;

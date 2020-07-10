@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2014, 2016-2019 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2014, 2016-2018 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -284,8 +284,7 @@ static void apr_adsp_down(unsigned long opcode)
 	dispatch_event(opcode, APR_DEST_QDSP6);
 }
 
-static void apr_add_child_devices(struct work_struct *work)
-{
+static void apr_add_child_devices(struct work_struct *work) {
 	int ret;
 
 	ret = of_platform_populate(apr_dev_ptr->of_node,
@@ -1156,8 +1155,10 @@ static int apr_probe(struct platform_device *pdev)
 	apr_set_subsys_state();
 	mutex_init(&q6.lock);
 	apr_reset_workqueue = create_singlethread_workqueue("apr_driver");
-	if (!apr_reset_workqueue)
+	if (!apr_reset_workqueue) {
+		pr_err("%s: failed apr reset workqueue\n", __func__);
 		return -ENOMEM;
+	}
 
 	apr_pkt_ctx = ipc_log_context_create(APR_PKT_IPC_LOG_PAGE_CNT,
 						"apr", 0);
@@ -1171,8 +1172,8 @@ static int apr_probe(struct platform_device *pdev)
 			      &modem_service_nb);
 
 	apr_tal_init();
-	apr_dev_ptr = &pdev->dev;
 	INIT_DELAYED_WORK(&add_chld_dev_work, apr_add_child_devices);
+	apr_dev_ptr = &pdev->dev;
 	return apr_debug_init();
 }
 

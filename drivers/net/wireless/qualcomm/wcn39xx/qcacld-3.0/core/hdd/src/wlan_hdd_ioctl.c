@@ -7606,6 +7606,175 @@ static int drv_cmd_get_disable_chan_list(struct hdd_adapter *adapter,
 }
 #endif
 
+#ifdef SEC_CONFIG_POWER_BACKOFF
+
+#define WLAN_HDD_UI_SET_GRIP_TX_PWR_VALUE_OFFSET 21
+int sec_sar_index = 0;
+
+#ifdef SEC_CONFIG_WLAN_BEACON_CHECK
+int hdd_set_bmiss_count_check(hdd_adapter_t *adapter,
+			      hdd_context_t *hdd_ctx, bool enable) {
+	uint8_t ret_val;
+
+	if (enable) {
+		// set bmiss first / final to 30
+		// set kickout count to 2048
+		hdd_err("hdd_set_bmiss_count_check enabled");
+		hdd_debug("Bmiss first cnt(10), Bmiss final cnt(50)");
+		ret_val = sme_set_roam_bmiss_final_bcnt(hdd_ctx->hHal,
+			0, 50);
+
+
+		if (ret_val) {
+			hdd_err("Failed to set bmiss final Bcnt");
+			return ret_val;
+		}
+
+		ret_val = sme_set_bmiss_bcnt(adapter->sessionId, 10, 50);
+		if (ret_val) {
+			hdd_err("Failed to set bmiss Bcnt");
+			return ret_val;
+		}
+
+		hdd_debug("tx fail count 2048");
+		ret_val = sme_update_tx_fail_cnt_threshold(hdd_ctx->hHal,
+							   adapter->sessionId, 2048);
+		if (ret_val) {
+			hdd_err("Failed to set kickout count");
+			return ret_val;
+		}
+	} else {
+		// set to default value.
+		hdd_err("hdd_set_bmiss_count_check default");
+		hdd_debug("Bmiss first cnt(%d), Bmiss final cnt(%d)",
+			hdd_ctx->config->nRoamBmissFirstBcnt,
+			hdd_ctx->config->nRoamBmissFinalBcnt);
+		ret_val = sme_set_roam_bmiss_final_bcnt(hdd_ctx->hHal,
+			0, hdd_ctx->config->nRoamBmissFinalBcnt);
+		if (ret_val) {
+			hdd_err("Failed to set bmiss final Bcnt");
+			return ret_val;
+		}
+
+		ret_val = sme_set_bmiss_bcnt(adapter->sessionId,
+			hdd_ctx->config->nRoamBmissFirstBcnt,
+			hdd_ctx->config->nRoamBmissFinalBcnt);
+		if (ret_val) {
+			hdd_err("Failed to set bmiss Bcnt");
+			return ret_val;
+		}
+
+		hdd_debug("tx fail count to %d",
+			  hdd_ctx->config->pkt_err_disconn_th);
+		ret_val = sme_update_tx_fail_cnt_threshold(hdd_ctx->hHal,
+				   adapter->sessionId,
+				   hdd_ctx->config->pkt_err_disconn_th);
+		if (ret_val) {
+			hdd_err("Failed to set kickout count");
+			return ret_val;
+		}
+	}
+	return ret_val;
+}
+
+void hdd_skip_bmiss_set_timer_handler(void *data)
+{
+	hdd_context_t *hdd_ctx = (hdd_context_t *) data;
+	hdd_adapter_t *adapter = NULL;
+
+	hdd_debug("Skip Bmiss set timer expired");
+
+	adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
+	if (!adapter) {
+		hdd_err("No adapter for STA mode");
+		return;
+	}
+
+	hdd_set_bmiss_count_check(adapter, hdd_ctx, hdd_ctx->bmiss_set_last);
+	return;
+}
+#endif
+
+int hdd_set_sar_power_limit(struct hdd_context *hdd_ctx, uint8_t index, bool enable)
+{
+	int status = 0;
+	struct sar_limit_cmd_params sar_limit_cmd = {0};
+	mac_handle_t mac_handle;
+
+	/* Vendor command manadates all SAR Specs in single call */
+	sar_limit_cmd.commit_limits = 1;
+	sar_limit_cmd.num_limit_rows = 0;
+
+	if (enable) {
+		sec_sar_index |= (1 << index);
+	} else {
+		sec_sar_index &= ~(1 << index);
+	}
+
+	hdd_info("sec_sar_index 0x%x - 0: no backoff, 1: grip, 2: dbs, 3: grip+dbs", sec_sar_index);
+
+	if (!sec_sar_index) {
+		sar_limit_cmd.sar_enable = WMI_SAR_FEATURE_OFF;
+	} else if (sec_sar_index == (1 << SAR_POWER_LIMIT_FOR_GRIP_SENSOR)) {
+		sar_limit_cmd.sar_enable = WMI_SAR_FEATURE_ON_SET_0;
+	} else if (sec_sar_index == (1 << SAR_POWER_LIMIT_FOR_DBS)) {
+		sar_limit_cmd.sar_enable = WMI_SAR_FEATURE_ON_SET_1;
+	} else if (sec_sar_index == (1 << SAR_POWER_LIMIT_FOR_GRIP_SENSOR |
+				   1 << SAR_POWER_LIMIT_FOR_DBS)) {
+		sar_limit_cmd.sar_enable = WMI_SAR_FEATURE_ON_SET_2;
+	}
+
+	hdd_info("sar_enable = %d", sar_limit_cmd.sar_enable);
+
+	mac_handle = hdd_ctx->mac_handle;
+	status = sme_set_sar_power_limits(mac_handle, &sar_limit_cmd);
+	if (status < 0)
+		hdd_err("Failed to sme_set_sar_power_limits status %d", status);
+
+	return status;
+}
+
+static int drv_cmd_grip_power_set_tx_power_calling(struct hdd_adapter *adapter,
+			 struct hdd_context *hdd_ctx,
+			 uint8_t *command,
+			 uint8_t command_len,
+			 struct hdd_priv_data *priv_data)
+{
+	int status = 0;
+	uint8_t set_value;
+
+	hdd_info("command %s UL %d, TL %d", command, priv_data->used_len,
+		 priv_data->total_len);
+
+	/* convert the value from ascii to integer */
+	set_value = command[WLAN_HDD_UI_SET_GRIP_TX_PWR_VALUE_OFFSET] - '0';
+
+	if (!set_value) {
+		hdd_set_sar_power_limit(hdd_ctx, SAR_POWER_LIMIT_FOR_GRIP_SENSOR, 1);
+#ifdef SEC_CONFIG_WLAN_BEACON_CHECK
+		hdd_ctx->bmiss_set_last = TRUE;
+		if (QDF_TIMER_STATE_RUNNING != qdf_mc_timer_get_current_state(&hdd_ctx->skip_bmiss_set_timer)) {
+			hdd_set_bmiss_count_check(adapter, hdd_ctx, TRUE);
+			qdf_mc_timer_start(&hdd_ctx->skip_bmiss_set_timer, (10+50)*100); /* 6 sec */
+		}
+#endif
+	} else {
+		hdd_set_sar_power_limit(hdd_ctx, SAR_POWER_LIMIT_FOR_GRIP_SENSOR, 0);
+#ifdef SEC_CONFIG_WLAN_BEACON_CHECK
+		hdd_ctx->bmiss_set_last = FALSE;
+		if (QDF_TIMER_STATE_RUNNING != qdf_mc_timer_get_current_state(&hdd_ctx->skip_bmiss_set_timer)) {
+			hdd_set_bmiss_count_check(adapter, hdd_ctx, FALSE);
+			qdf_mc_timer_start(&hdd_ctx->skip_bmiss_set_timer,
+					   (hdd_ctx->config->nRoamBmissFirstBcnt + hdd_ctx->config->nRoamBmissFinalBcnt)*100);
+		}
+#endif
+	}
+	/* << test code */
+
+	return status;
+}
+#endif /* SEC_CONFIG_POWER_BACKOFF */
+
 #ifdef FEATURE_ANI_LEVEL_REQUEST
 static int drv_cmd_get_ani_level(struct hdd_adapter *adapter,
 				 struct hdd_context *hdd_ctx,
@@ -7885,8 +8054,16 @@ static const struct hdd_drv_cmd hdd_drv_cmds[] = {
 	{"CHANNEL_SWITCH",            drv_cmd_set_channel_switch, true},
 	{"SETANTENNAMODE",            drv_cmd_set_antenna_mode, true},
 	{"GETANTENNAMODE",            drv_cmd_get_antenna_mode, false},
+#ifdef CONFIG_SEC
+	{"SET_INDOOR_CHANNELS",       drv_cmd_set_disable_chan_list, true},
+	{"GET_INDOOR_CHANNELS",       drv_cmd_get_disable_chan_list, false},
+#else
 	{"SET_DISABLE_CHANNEL_LIST",  drv_cmd_set_disable_chan_list, true},
 	{"GET_DISABLE_CHANNEL_LIST",  drv_cmd_get_disable_chan_list, false},
+#endif /* CONFIG_SEC */
+#ifdef SEC_CONFIG_POWER_BACKOFF
+	{"SET_TX_POWER_CALLING",      drv_cmd_grip_power_set_tx_power_calling},
+#endif /* SEC_CONFIG_POWER_BACKOFF */
 	{"GET_ANI_LEVEL",             drv_cmd_get_ani_level, false},
 	{"STOP",                      drv_cmd_dummy, false},
 	/* Deprecated commands */

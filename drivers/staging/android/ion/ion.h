@@ -286,4 +286,7 @@ static inline int ion_handle_get_flags(struct ion_client *client,
 }
 
 #endif /* CONFIG_ION */
+
+unsigned int get_ion_system_heap_id(void);
+
 #endif /* _LINUX_ION_H */

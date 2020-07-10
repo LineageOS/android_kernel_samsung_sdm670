@@ -19,6 +19,10 @@
 #include "sde_formats.h"
 #include "sde_trace.h"
 
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+#include "ss_dsi_panel_common.h"
+#endif
+
 #define SDE_DEBUG_CMDENC(e, fmt, ...) SDE_DEBUG("enc%d intf%d " fmt, \
 		(e) && (e)->base.parent ? \
 		(e)->base.parent->base.id : -1, \
@@ -33,7 +37,16 @@
 	container_of(x, struct sde_encoder_phys_cmd, base)
 
 #define PP_TIMEOUT_MAX_TRIALS	2
-
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+/*
+ * Incase of AOD, 1frame takes 33ms(30FPS)
+ * So we need to wait more time than normal case
+ */
+#define CTL_START_TIMEOUT_MS	100
+#else
+/* wait for 2 vyncs only */
+#define CTL_START_TIMEOUT_MS	32
+#endif
 /*
  * Tearcheck sync start and continue thresholds are empirically found
  * based on common panels In the future, may want to allow panels to override
@@ -495,6 +508,10 @@ static int _sde_encoder_phys_cmd_handle_ppdone_timeout(
 			atomic_read(&phys_enc->pending_kickoff_cnt),
 			frame_event);
 
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+	SS_XLOG(cmd_enc->pp_timeout_report_cnt);
+#endif
+
 	/* check if panel is still sending TE signal or not */
 	if (sde_connector_esd_status(phys_enc->connector))
 		goto exit;
@@ -502,8 +519,13 @@ static int _sde_encoder_phys_cmd_handle_ppdone_timeout(
 	if (cmd_enc->pp_timeout_report_cnt >= PP_TIMEOUT_MAX_TRIALS) {
 		cmd_enc->pp_timeout_report_cnt = PP_TIMEOUT_MAX_TRIALS;
 		frame_event |= SDE_ENCODER_FRAME_EVENT_PANEL_DEAD;
-
+#if defined(CONFIG_DISPLAY_SAMSUNG) && defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
+		/* Samsung panel recovery instead of panic temp */
+		phys_enc->sde_kms->base.funcs->ss_callback(PRIMARY_DISPLAY_NDX,
+			SS_EVENT_PANEL_RECOVERY, NULL);
+#else
 		SDE_DBG_DUMP("panic");
+#endif
 	} else if (cmd_enc->pp_timeout_report_cnt == 1) {
 		/* to avoid flooding, only log first time, and "dead" time */
 		SDE_ERROR_CMDENC(cmd_enc,
@@ -514,6 +536,20 @@ static int _sde_encoder_phys_cmd_handle_ppdone_timeout(
 				atomic_read(&phys_enc->pending_kickoff_cnt));
 
 		SDE_EVT32(DRMID(phys_enc->parent), SDE_EVTLOG_FATAL);
+
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+		phys_enc->sde_kms->base.funcs->ss_callback(PRIMARY_DISPLAY_NDX,
+			SS_EVENT_CHECK_TE, (void *)phys_enc);
+		inc_dpui_u32_field(DPUI_KEY_QCT_PPTO, 1);
+#endif
+#if defined(CONFIG_DISPLAY_SAMSUNG) && defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
+		SDE_DBG_DUMP("all", "dbg_bus", "vbif_dbg_bus");
+		if (sec_debug_is_enabled()) SDE_DBG_DUMP("panic");
+#elif defined(CONFIG_DISPLAY_SAMSUNG)
+		SDE_DBG_DUMP("all", "dbg_bus", "vbif_dbg_bus", "panic");
+#else
+		SDE_DBG_DUMP("all", "dbg_bus", "vbif_dbg_bus");
+#endif
 	}
 
 	/* request a ctl reset before the next kickoff */

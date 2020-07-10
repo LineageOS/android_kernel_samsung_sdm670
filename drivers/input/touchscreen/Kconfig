@@ -1444,4 +1444,10 @@ config TOUCHSCREEN_EKTF3XXX_CHIPSET
 
 		  If unusre, say N.
 
+source "drivers/input/touchscreen/zinitix/Kconfig"
+source "drivers/input/touchscreen/synaptics_ts/td4300/Kconfig"
+source "drivers/input/touchscreen/novatek/nt36672/Kconfig"
+source "drivers/input/touchscreen/stm/fts1ba90a/Kconfig"
+source "drivers/input/touchscreen/stm/fts1ba90/Kconfig"
+
 endif

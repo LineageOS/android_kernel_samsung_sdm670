@@ -94,17 +94,20 @@ endif
 ifdef CONFIG_DTS_SRS_TM
 	Q6_OBJS += msm-dts-srs-tm-config.o
 endif
+ifdef CONFIG_SEC_SND_ADAPTATION
+	Q6_OBJS += q6audio_adaptation.o
+endif
 
 ifdef CONFIG_MSM_ADSP_LOADER
 ADSP_LOADER_OBJS += adsp-loader.o
 endif
 
-ifdef CONFIG_MSM_QDSP6_NOTIFIER
-QDSP6_NOTIFIER_OBJS += audio_notifier.o audio_ssr.o
-endif
-
 ifdef CONFIG_MSM_QDSP6_PDR
 QDSP6_PDR_OBJS += audio_pdr.o
+endif
+
+ifdef CONFIG_MSM_QDSP6_NOTIFIER
+QDSP6_NOTIFIER_OBJS += audio_notifier.o audio_ssr.o
 endif
 
 ifdef CONFIG_MSM_ULTRASOUND
