@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -50,7 +50,7 @@ typedef int (*cam_req_mgr_add_req)(struct cam_req_mgr_add_request *);
  * @cam_req_mgr_link_setup  : to establish link with device for a session
  * @cam_req_mgr_notify_err  : to broadcast error happened on link for request id
  * @cam_req_mgr_apply_req   : CRM asks device to apply certain request id.
- * @cam_req_mgr_flush_req   : Flush or cancel request
+ * @cam_req_mgr_flush_req   : Flush or cancle request
  * cam_req_mgr_process_evt  : generic events
  */
 typedef int (*cam_req_mgr_get_dev_info) (struct cam_req_mgr_device_info *);
@@ -201,14 +201,12 @@ enum cam_req_mgr_link_evt_type {
  * @frame_id : frame id for internal tracking
  * @trigger  : trigger point of this notification, CRM will send apply
  * only to the devices which subscribe to this point.
- * @sof_timestamp_val: Captured time stamp value at sof hw event
  */
 struct cam_req_mgr_trigger_notify {
 	int32_t  link_hdl;
 	int32_t  dev_hdl;
 	int64_t  frame_id;
 	uint32_t trigger;
-	uint64_t sof_timestamp_val;
 };
 
 /**
