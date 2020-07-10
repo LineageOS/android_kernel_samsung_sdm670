@@ -16,6 +16,14 @@
 
 #include <linux/clk.h>
 #include "dp_power.h"
+#ifdef CONFIG_SEC_DISPLAYPORT
+#include <linux/regulator/consumer.h>
+#include <linux/delay.h>
+#include "secdp.h"
+#ifdef CONFIG_COMBO_REDRIVER
+#include <linux/combo_redriver/ptn36502.h>
+#endif
+#endif
 
 #define DP_CLIENT_NAME_SIZE	20
 
@@ -31,7 +39,14 @@ struct dp_power_private {
 
 	bool core_clks_on;
 	bool link_clks_on;
+#ifdef CONFIG_SEC_DISPLAYPORT
+	bool aux_pullup_on;
+#endif
 };
+
+#ifdef CONFIG_SEC_DISPLAYPORT
+struct dp_power_private *g_secdp_power;
+#endif
 
 static int dp_power_regulator_init(struct dp_power_private *power)
 {
@@ -81,6 +96,83 @@ static void dp_power_regulator_deinit(struct dp_power_private *power)
 	}
 }
 
+#ifdef CONFIG_SEC_DISPLAYPORT
+extern struct regulator *aux_pullup_vreg;
+
+/* factory use only
+ * ref: qusb_phy_enable_power()
+ */
+static int secdp_aux_pullup_vreg_enable(bool on)
+{
+	int rc = 0;
+	struct dp_power_private *power = g_secdp_power;
+	struct regulator *aux_pu_vreg = aux_pullup_vreg;
+
+	pr_debug("+++, on(%d)\n", on);
+
+	if (!aux_pu_vreg) {
+		pr_err("vdda33 is null!\n");
+		goto exit;
+	}
+
+#define QUSB2PHY_3P3_VOL_MIN		3075000 /* uV */
+#define QUSB2PHY_3P3_VOL_MAX		3200000 /* uV */
+#define QUSB2PHY_3P3_HPM_LOAD		30000	/* uA */
+
+	if (on) {
+		if (power->aux_pullup_on) {
+			pr_info("already on\n");
+			goto exit;
+		}
+
+		rc = regulator_set_load(aux_pu_vreg, QUSB2PHY_3P3_HPM_LOAD);
+		if (rc < 0) {
+			pr_err("Unable to set HPM of vdda33: %d\n", rc);
+			goto exit;
+		}
+
+		rc = regulator_set_voltage(aux_pu_vreg, QUSB2PHY_3P3_VOL_MIN,
+					QUSB2PHY_3P3_VOL_MAX);
+		if (rc) {
+			pr_err("Unable to set voltage for vdda33: %d\n", rc);
+			goto put_vdda33_lpm;
+		}
+
+		rc = regulator_enable(aux_pu_vreg);
+		if (rc) {
+			pr_err("Unable to enable vdda33: %d\n", rc);
+			goto unset_vdd33;
+		}
+
+		pr_info("on success\n");
+		power->aux_pullup_on = true;
+	} else {
+
+		rc = regulator_disable(aux_pu_vreg);
+		if (rc)
+			pr_err("Unable to disable vdda33: %d\n", rc);
+
+unset_vdd33:
+		rc = regulator_set_voltage(aux_pu_vreg, 0, QUSB2PHY_3P3_VOL_MAX);
+		if (rc)
+			pr_err("Unable to set (0) voltage for vdda33: %d\n", rc);
+
+put_vdda33_lpm:
+		rc = regulator_set_load(aux_pu_vreg, 0);
+		if (rc < 0)
+			pr_err("Unable to set (0) HPM of vdda33: %d\n", rc);
+
+		if (!rc)
+			pr_info("off success\n");
+
+		power->aux_pullup_on = false;
+	}
+
+exit:
+	return rc;
+}
+#endif
+
 static int dp_power_regulator_ctrl(struct dp_power_private *power, bool enable)
 {
 	int rc = 0, i = 0, j = 0;
@@ -106,6 +198,11 @@ static int dp_power_regulator_ctrl(struct dp_power_private *power, bool enable)
 			goto error;
 		}
 	}
+
+#ifdef CONFIG_SEC_DISPLAYPORT
+	secdp_aux_pullup_vreg_enable(enable);
+#endif
+
 error:
 	return rc;
 }
@@ -135,6 +232,13 @@ static int dp_power_pinctrl_set(struct dp_power_private *power, bool active)
 		       active ? "dp_active"
 		       : "dp_sleep");
 	}
+
+#ifdef CONFIG_SEC_DISPLAYPORT
+	if (rc) {
+		pr_debug("rc: %d -> it's ok\n", rc);
+		rc = 0;
+	}
+#endif
 
 	return rc;
 }
@@ -288,6 +392,27 @@ static int dp_power_clk_enable(struct dp_power *dp_power,
 		}
 	}
 
+#ifdef CONFIG_SEC_DISPLAYPORT
+	if (!enable) {
+		/* consider below abnormal sequence :
+		 * CCIC_NOTIFY_ATTACH
+		 * -> no CCIC_NOTIFY_ID_DP_LINK_CONF, no CCIC_NOTIFY_ID_DP_HPD
+		 * -> CCIC_NOTIFY_DETACH
+		 */
+		if ((pm_type == DP_CORE_PM)
+			&& (!power->core_clks_on)) {
+			pr_debug("core clks already disabled\n");
+			return 0;
+		}
+
+		if ((pm_type == DP_CTRL_PM)
+			&& (!power->link_clks_on)) {
+			pr_debug("links clks already disabled\n");
+			return 0;
+		}
+	}
+#endif
+
 	rc = dp_power_clk_set_rate(power, pm_type, enable);
 	if (rc) {
 		pr_err("failed to '%s' clks for: %s. err=%d\n",
@@ -356,6 +481,7 @@ static bool dp_power_find_gpio(const char *gpio1, const char *gpio2)
 	return !!strnstr(gpio1, gpio2, strlen(gpio1));
 }
 
+#ifndef CONFIG_SEC_DISPLAYPORT
 static void dp_power_set_gpio(struct dp_power_private *power, bool flip)
 {
 	int i;
@@ -381,11 +507,306 @@ static void dp_power_set_gpio(struct dp_power_private *power, bool flip)
 		config++;
 	}
 }
+#else
+int secdp_power_request_gpios(struct dp_power *dp_power)
+{
+	int rc;
+	struct dp_power_private *power;
+
+	if (!dp_power) {
+		pr_err("invalid power data\n");
+		rc = -EINVAL;
+		goto exit;
+	}
+
+	power = container_of(dp_power, struct dp_power_private, dp_power);
+	rc = dp_power_request_gpios(power);
+
+exit:
+	return rc;
+}
+
+#ifdef CONFIG_COMBO_REDRIVER
+void secdp_redriver_onoff(bool enable, int lane)
+{
+	pr_debug("+++ enable(%d), lane(%d)\n", enable, lane);
+
+	if (enable) {
+		int val = -1;
+
+		if (lane == 2)
+			ptn36502_config(DP2_LANE_USB3_MODE, 1);
+		else if (lane == 4)
+			ptn36502_config(DP4_LANE_MODE, 1);
+		else {
+			pr_err("error! unknown lane: %d\n", lane);
+			goto exit;
+		}
+
+		val = ptn36502_i2c_read(Chip_ID);
+		pr_info("Chip_ID:  0x%x\n", val);
+
+		val = ptn36502_i2c_read(Chip_Rev);
+		pr_info("Chip_Rev: 0x%x\n", val);
+
+	} else {
+		ptn36502_config(SAFE_STATE, 0);
+	}
+
+exit:
+	return;
+}
+
+#define DP_ENUM_STR(x)	#x
+
+enum redriver_switch_t
+{
+	REDRIVER_SWITCH_UNKNOWN = -1,
+	REDRIVER_SWITCH_RESET = 0,
+	REDRIVER_SWITCH_CROSS,
+	REDRIVER_SWITCH_THROU,
+};
+
+static inline char *secdp_redriver_switch_to_string(int event)
+{
+	switch (event) {
+	case REDRIVER_SWITCH_UNKNOWN:	return DP_ENUM_STR(REDRIVER_SWITCH_UNKNOWN);
+	case REDRIVER_SWITCH_RESET:		return DP_ENUM_STR(REDRIVER_SWITCH_RESET);
+	case REDRIVER_SWITCH_CROSS:		return DP_ENUM_STR(REDRIVER_SWITCH_CROSS);
+	case REDRIVER_SWITCH_THROU:		return DP_ENUM_STR(REDRIVER_SWITCH_THROU);
+	default:						return "unknown";
+	}
+}
+
+static void secdp_redriver_aux_ctrl(int cross)
+{
+	pr_debug("+++ cross: %s\n", secdp_redriver_switch_to_string(cross));
+
+	switch (cross)
+	{
+	case REDRIVER_SWITCH_CROSS:
+		ptn36502_config(AUX_CROSS_MODE, 0);
+		break;
+	case REDRIVER_SWITCH_THROU:
+		ptn36502_config(AUX_THRU_MODE, 0);
+		break;
+	case REDRIVER_SWITCH_RESET:
+		ptn36502_config(SAFE_STATE, 0);
+		break;
+	default:
+		pr_info("unknown: %d\n", cross);
+		break;
+	}
+}
+#endif
+
+/* turn on EDP_AUX switch
+ * ===================================================
+ * | usbplug-cc(dir) | orientation | flip  | aux-sel |
+ * ===================================================
+ * |        0        |     CC1     | false |    0    |
+ * |        1        |     CC2     | true  |    1    |
+ * ===================================================
+ */
+static void secdp_power_set_gpio(bool flip)
+{
+	int i;
+	/*int dir = (flip == false) ? 0 : 1;*/
+	struct dp_power_private *power = g_secdp_power;
+	struct dss_module_power *mp = &power->parser->mp[DP_CORE_PM];
+	struct dss_gpio *config;
+
+	pr_debug("+++, flip(%d)\n", flip);
+
+#if 0 /*use flip instead*/
+	config = mp->gpio_config;
+	for (i = 0; i < mp->num_gpio; i++) {
+		if (gpio_is_valid(config->gpio)) {
+			if (dp_power_find_gpio(config->gpio_name, "usbplug-cc")) {
+				dir = gpio_get_value(config->gpio);
+				pr_info("%s -> dir: %d\n", config->gpio_name, dir);
+				break;
+			}
+		}
+		config++;
+	}
+
+	usleep_range(100, 120);
+#endif
+
+#ifndef CONFIG_COMBO_REDRIVER
+	config = mp->gpio_config;
+	for (i = 0; i < mp->num_gpio; i++) {
+		if (gpio_is_valid(config->gpio)) {
+			if (dp_power_find_gpio(config->gpio_name, "aux-sel")) {
+				gpio_direction_output(config->gpio, (flip == false)/*(dir == 0)*/ ? 0 : 1);
+				usleep_range(100, 120);
+				pr_info("%s -> set %d\n", config->gpio_name, gpio_get_value(config->gpio));
+				break;
+			}
+		}
+		config++;
+	}
+#endif
+
+	usleep_range(100, 120);
+	config = mp->gpio_config;
+	for (i = 0; i < mp->num_gpio; i++) {
+		if (gpio_is_valid(config->gpio)) {
+			if (dp_power_find_gpio(config->gpio_name, "aux-en")) {
+				gpio_direction_output(config->gpio, 0);
+				pr_info("%s -> %d\n", config->gpio_name, gpio_get_value(config->gpio));
+				break;
+			}
+		}
+		config++;
+	}
+}
+
+/* turn off EDP_AUX switch */
+static void secdp_power_unset_gpio(void)
+{
+	int i;
+	struct dp_power_private *power = g_secdp_power;
+	struct dss_module_power *mp = &power->parser->mp[DP_CORE_PM];
+	struct dss_gpio *config;
+
+	pr_debug("+++\n");
+
+	config = mp->gpio_config;
+	for (i = 0; i < mp->num_gpio; i++) {
+		if (gpio_is_valid(config->gpio)) {
+			if (dp_power_find_gpio(config->gpio_name, "aux-en")) {
+				gpio_direction_output(config->gpio, 1);
+				pr_info("%s -> 1\n", config->gpio_name);
+				break;
+			}
+		}
+		config++;
+	}
+
+	config = mp->gpio_config;
+	for (i = 0; i < mp->num_gpio; i++) {
+		if (gpio_is_valid(config->gpio)) {
+			if (dp_power_find_gpio(config->gpio_name, "aux-sel")) {
+				gpio_direction_output(config->gpio, 0);
+				pr_info("%s -> 0\n", config->gpio_name);
+				break;
+			}
+		}
+		config++;
+	}
+}
+
+/*
+ * @aux_sel : 1 or 0
+ */
+void secdp_config_gpios_factory(int aux_sel, bool on)
+{
+	pr_debug("%s (%d,%d)\n", __func__, aux_sel, on);
+
+	if (on) {
+		/* power on ldo24 */
+		secdp_aux_pullup_vreg_enable(true);
+
+#ifdef CONFIG_COMBO_REDRIVER
+		if (aux_sel == 1)
+			secdp_redriver_aux_ctrl(REDRIVER_SWITCH_CROSS);
+		else if (aux_sel == 0)
+			secdp_redriver_aux_ctrl(REDRIVER_SWITCH_THROU);
+		else
+			pr_err("unknown <%d>\n", aux_sel);
+#else
+		/* set aux_sel, aux_en */
+		secdp_power_set_gpio(aux_sel);
+#endif
+	} else {
+#ifdef CONFIG_COMBO_REDRIVER
+		secdp_redriver_aux_ctrl(REDRIVER_SWITCH_RESET);
+#else
+		/* unset aux_sel, aux_en */
+		secdp_power_unset_gpio();
+#endif
+
+		/* power off ldo24 */
+		secdp_aux_pullup_vreg_enable(false);
+	}
+}
+
+extern int CC_DIR;
+
+enum plug_orientation secdp_get_plug_orientation(void)
+{
+#if 1 /*org*/
+	int i, dir;
+	struct dp_power_private *power = g_secdp_power;
+	struct dss_module_power *mp = &power->parser->mp[DP_CORE_PM];
+	struct dss_gpio *config = mp->gpio_config;
+
+	for (i = 0; i < mp->num_gpio; i++) {
+		if (gpio_is_valid(config->gpio)) {
+			if (dp_power_find_gpio(config->gpio_name, "usbplug-cc")) {
+				dir = gpio_get_value(config->gpio);
+#if 1
+				/*tabs_2019 h/w rev01 -- CC_DIR comes reverted*/
+				dir = !dir;
+#endif
+				pr_info("orientation: %s\n", (dir == 0) ? "CC1" : "CC2");
+				if (dir == 0)
+					return ORIENTATION_CC1;
+				else /* if (dir == 1) */
+					return ORIENTATION_CC2;
+			}
+		}
+		config++;
+	}
+
+	/*cannot be here*/
+	return ORIENTATION_NONE;
+#else /*test*/
+	enum plug_orientation dir;
+
+	pr_debug("+++ CC_DIR:%d\n", CC_DIR);
+
+	if (CC_DIR == 0) {
+		dir = ORIENTATION_CC2;
+		pr_info("CC2\n");
+	} else if (CC_DIR == 1) {
+		dir = ORIENTATION_CC1;
+		pr_info("CC1\n");
+	} else {
+		dir = ORIENTATION_NONE;
+		pr_info("NONE??\n");
+	}
+
+	return dir;
+#endif
+}
+
+bool secdp_get_clk_status(enum dp_pm_type type)
+{
+	struct dp_power_private *power = g_secdp_power;
+	bool ret = false;
+
+	switch (type) {
+	case DP_CORE_PM:
+		ret = power->core_clks_on;
+		break;
+	default:
+		pr_err("invalid type:%d\n", type);
+		break;
+	}
+
+	return ret;
+}
+#endif
 
 static int dp_power_config_gpios(struct dp_power_private *power, bool flip,
 					bool enable)
 {
+#ifndef CONFIG_SEC_DISPLAYPORT
 	int rc = 0, i;
+#endif
 	struct dss_module_power *mp;
 	struct dss_gpio *config;
 
@@ -393,6 +814,7 @@ static int dp_power_config_gpios(struct dp_power_private *power, bool flip,
 	config = mp->gpio_config;
 
 	if (enable) {
+#ifndef CONFIG_SEC_DISPLAYPORT
 		rc = dp_power_request_gpios(power);
 		if (rc) {
 			pr_err("gpio request failed\n");
@@ -400,11 +822,18 @@ static int dp_power_config_gpios(struct dp_power_private *power, bool flip,
 		}
 
 		dp_power_set_gpio(power, flip);
+#else
+		secdp_power_set_gpio(flip);
+#endif
 	} else {
+#ifndef CONFIG_SEC_DISPLAYPORT
 		for (i = 0; i < mp->num_gpio; i++) {
 			gpio_set_value(config[i].gpio, 0);
 			gpio_free(config[i].gpio);
 		}
+#else
+		secdp_power_unset_gpio();
+#endif
 	}
 
 	return 0;
@@ -445,6 +874,14 @@ static int dp_power_client_init(struct dp_power *dp_power,
 		rc = -EINVAL;
 		goto error_client;
 	}
+
+#ifdef CONFIG_SEC_DISPLAYPORT
+	rc = dp_power_pinctrl_set(power, false);
+	if (rc) {
+		pr_err("failed to set pinctrl state\n");
+		goto error_client;
+	}
+#endif
 	return 0;
 
 error_client:
@@ -494,6 +931,8 @@ static int dp_power_init(struct dp_power *dp_power, bool flip)
 {
 	int rc = 0;
 	struct dp_power_private *power;
+
+	pr_debug("+++\n");
 
 	if (!dp_power) {
 		pr_err("invalid power data\n");
@@ -552,6 +991,8 @@ static int dp_power_deinit(struct dp_power *dp_power)
 {
 	int rc = 0;
 	struct dp_power_private *power;
+
+	pr_debug("+++\n");
 
 	if (!dp_power) {
 		pr_err("invalid power data\n");
@@ -614,6 +1055,10 @@ struct dp_power *dp_power_get(struct dp_parser *parser)
 	dp_power->power_client_init = dp_power_client_init;
 	dp_power->power_client_deinit = dp_power_client_deinit;
 
+#ifdef CONFIG_SEC_DISPLAYPORT
+	g_secdp_power = power;
+#endif
+
 	return dp_power;
 error:
 	return ERR_PTR(rc);
@@ -629,4 +1074,8 @@ void dp_power_put(struct dp_power *dp_power)
 	power = container_of(dp_power, struct dp_power_private, dp_power);
 
 	devm_kfree(&power->pdev->dev, power);
+
+#ifdef CONFIG_SEC_DISPLAYPORT
+	g_secdp_power = NULL;
+#endif
 }

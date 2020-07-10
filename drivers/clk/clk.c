@@ -30,6 +30,9 @@
 #include <linux/pm_opp.h>
 #include <linux/regulator/consumer.h>
 
+#include <linux/sec_debug.h>
+#include <trace/events/power.h>
+
 #include "clk.h"
 
 #if defined(CONFIG_COMMON_CLK)
@@ -94,6 +97,8 @@ struct clk_core {
 	unsigned long		*rate_max;
 	int			num_rate_max;
 };
+extern unsigned int sec_debug_level(void);
+bool is_dbg_level_low;
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/clk.h>
@@ -1811,6 +1816,8 @@ static int clk_change_rate(struct clk_core *core)
 	}
 
 	trace_clk_set_rate(core, core->new_rate);
+	sec_debug_clock_rate_log(core->name, core->new_rate,
+				 raw_smp_processor_id());
 
 	/* Enforce vdd requirements for new frequency. */
 	if (core->prepare_count) {
@@ -1847,6 +1854,8 @@ static int clk_change_rate(struct clk_core *core)
 	}
 
 	trace_clk_set_rate_complete(core, core->new_rate);
+	sec_debug_clock_rate_complete_log(core->name, core->new_rate,
+					  raw_smp_processor_id());
 
 	/* Release vdd requirements for old frequency. */
 	if (core->prepare_count)
@@ -2365,7 +2374,11 @@ EXPORT_SYMBOL_GPL(clk_list_frequency);
 
 static struct dentry *rootdir;
 static int inited = 0;
-static u32 debug_suspend;
+#ifdef CONFIG_SEC_PM_DEBUG
+static u32 debug_suspend = 1;
+#else
+static u32 debug_suspend = 1;
+#endif
 static DEFINE_MUTEX(clk_debug_lock);
 static HLIST_HEAD(clk_debug_list);
 
@@ -3076,6 +3089,12 @@ static int __init clk_debug_init(void)
 	struct dentry *d;
 
 	rootdir = debugfs_create_dir("clk", NULL);
+
+	//ANDROID_DEBUG_LEVEL_LOW		0x4f4c
+	if (sec_debug_level() == 0x4f4c)
+		is_dbg_level_low = true;
+	else
+		is_dbg_level_low = false;
 
 	if (!rootdir)
 		return -ENOMEM;

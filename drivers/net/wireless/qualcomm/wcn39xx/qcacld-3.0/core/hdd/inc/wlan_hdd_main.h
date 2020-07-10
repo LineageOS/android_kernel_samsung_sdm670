@@ -2066,6 +2066,10 @@ struct hdd_context {
 	unsigned long derived_intf_addr_mask;
 	struct wlan_mlme_chain_cfg fw_chain_cfg;
 	struct sar_limit_cmd_params *sar_cmd_params;
+#ifdef SEC_CONFIG_WLAN_BEACON_CHECK
+	qdf_mc_timer_t skip_bmiss_set_timer;
+	bool bmiss_set_last;
+#endif
 };
 
 /**
@@ -2158,7 +2162,9 @@ enum {
 /*
  * Function declarations and documentation
  */
-
+#ifdef SEC_CONFIG_PSM_SYSFS
+int wlan_hdd_sec_get_psm(void);
+#endif /* SEC_CONFIG_PSM_SYSFS */
 int hdd_validate_channel_and_bandwidth(struct hdd_adapter *adapter,
 				uint32_t chan_number,
 				enum phy_ch_width chan_bw);
