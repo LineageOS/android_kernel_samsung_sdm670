@@ -66,7 +66,13 @@
 #define LINESTATE_DP			BIT(0)
 #define LINESTATE_DM			BIT(1)
 
-#define BIAS_CTRL_2_OVERRIDE_VAL	0x28
+#ifdef CONFIG_SEC_GTS4LV_PROJECT
+#define BIAS_CTRL_2_OVERRIDE_VAL	0x1B
+#define BIAS_CTRL_2_OVERRIDE_VAL_HOST	0x20
+#else
+#define BIAS_CTRL_2_OVERRIDE_VAL	0x20
+#define BIAS_CTRL_2_OVERRIDE_VAL_HOST	0x28
+#endif
 
 #define SQ_CTRL1_CHIRP_DISABLE		0x20
 #define SQ_CTRL2_CHIRP_DISABLE		0x80
@@ -422,7 +428,7 @@ static void qusb_phy_get_tune1_param(struct qusb_phy *qphy)
 	u8 reg;
 	u32 bit_mask = 1;
 
-	pr_debug("%s(): num_of_bits:%d bit_pos:%d\n", __func__,
+	pr_info("%s(): num_of_bits:%d bit_pos:%d\n", __func__,
 				qphy->efuse_num_of_bits,
 				qphy->efuse_bit_pos);
 
@@ -434,7 +440,7 @@ static void qusb_phy_get_tune1_param(struct qusb_phy *qphy)
 	 * tune parameters
 	 */
 	qphy->tune_val = readl_relaxed(qphy->efuse_reg);
-	pr_debug("%s(): bit_mask:%d efuse based tune1 value:%d\n",
+	pr_info("%s(): bit_mask:%d efuse based tune1 value:%d\n",
 				__func__, bit_mask, qphy->tune_val);
 
 	qphy->tune_val = TUNE_VAL_MASK(qphy->tune_val,
@@ -453,9 +459,10 @@ static void qusb_phy_write_seq(void __iomem *base, u32 *seq, int cnt,
 {
 	int i;
 
-	pr_debug("Seq count:%d\n", cnt);
+	pr_info("Seq count:%d\n", cnt);
 	for (i = 0; i < cnt; i = i+2) {
-		pr_debug("write 0x%02x to 0x%02x\n", seq[i], seq[i+1]);
+		pr_info("before 0x%02x write 0x%02x to 0x%02x\n", 
+				readb_relaxed(base + seq[i+1]), seq[i], seq[i+1]);
 		writel_relaxed(seq[i], base + seq[i+1]);
 		if (delay)
 			usleep_range(delay, (delay + 2000));
@@ -516,10 +523,13 @@ static void qusb_phy_host_init(struct usb_phy *phy)
 	/* If soc revision is mentioned and host_chirp_erratum flag is set
 	 * then override TUNE1 and DEBUG_CTRL1 while honouring efuse values
 	 */
-	if (qphy->soc_min_rev && qphy->host_chirp_erratum) {
+	pr_info("%s : qphy->soc_min_rev=%d , qphy->host_chirp_erratum=%d\n", __func__, 
+		qphy->soc_min_rev, qphy->host_chirp_erratum);
+
+	if (qphy->host_chirp_erratum) {
 		writel_relaxed(qphy->tune_val | BIT(7),
 			qphy->base + qphy->phy_reg[PORT_TUNE1]);
-		pr_debug("%s(): Programming TUNE1 parameter as:%x\n",
+		pr_info("%s(): Programming TUNE1 parameter as:%x\n",
 			__func__, readb_relaxed(qphy->base +
 					qphy->phy_reg[PORT_TUNE1]));
 		writel_relaxed(DEBUG_CTRL1_OVERRIDE_VAL,
@@ -538,8 +548,10 @@ static void qusb_phy_host_init(struct usb_phy *phy)
 	}
 
 	if (qphy->refgen_north_bg_reg && qphy->override_bias_ctrl2)
+		pr_info("%s(): refgen_north_bg_reg : 0x%x\n", __func__,
+			readl_relaxed(qphy->refgen_north_bg_reg));
 		if (readl_relaxed(qphy->refgen_north_bg_reg) & BANDGAP_BYPASS)
-			writel_relaxed(BIAS_CTRL_2_OVERRIDE_VAL,
+			writel_relaxed(BIAS_CTRL_2_OVERRIDE_VAL_HOST,
 				qphy->base + qphy->phy_reg[BIAS_CTRL_2]);
 
 	if (qphy->bias_ctrl2)
@@ -558,6 +570,13 @@ static void qusb_phy_host_init(struct usb_phy *phy)
 		dev_err(phy->dev, "QUSB PHY PLL LOCK fails:%x\n", reg);
 		WARN_ON(1);
 	}
+	pr_info("%s():Setting qusb phy val: imp_ctrl1 %x, tune1 %x, tune2 %x, tune4 %x, bias_control2 %x\n",
+		__func__,
+		(readl_relaxed(qphy->base + 0x220) & 0xff),
+		(readl_relaxed(qphy->base + 0x240) & 0xff),
+		(readl_relaxed(qphy->base + 0x244) & 0xff),
+		(readl_relaxed(qphy->base + 0x24c) & 0xff),
+		(readl_relaxed(qphy->base + 0x198) & 0xff));
 }
 
 static int qusb_phy_init(struct usb_phy *phy)
@@ -618,7 +637,7 @@ static int qusb_phy_init(struct usb_phy *phy)
 		if (!qphy->tune_val)
 			qusb_phy_get_tune1_param(qphy);
 
-		pr_debug("%s(): Programming TUNE1 parameter as:%x\n", __func__,
+		pr_info("%s(): Programming TUNE1 parameter as:%x\n", __func__,
 				qphy->tune_val);
 		writel_relaxed(qphy->tune_val,
 				qphy->base + qphy->phy_reg[PORT_TUNE1]);
@@ -632,10 +651,13 @@ static int qusb_phy_init(struct usb_phy *phy)
 							(4 * p_index));
 	}
 
-	if (qphy->refgen_north_bg_reg && qphy->override_bias_ctrl2)
+	if (qphy->refgen_north_bg_reg && qphy->override_bias_ctrl2) {
+		pr_info("%s(): refgen_north_bg_reg : 0x%x\n", __func__,
+			readl_relaxed(qphy->refgen_north_bg_reg));
 		if (readl_relaxed(qphy->refgen_north_bg_reg) & BANDGAP_BYPASS)
 			writel_relaxed(BIAS_CTRL_2_OVERRIDE_VAL,
 				qphy->base + qphy->phy_reg[BIAS_CTRL_2]);
+	}
 
 	if (qphy->bias_ctrl2)
 		writel_relaxed(qphy->bias_ctrl2,
@@ -651,6 +673,14 @@ static int qusb_phy_init(struct usb_phy *phy)
 
 	/* Ensure above write is completed before turning ON ref clk */
 	wmb();
+
+	pr_info("%s():Setting qusb phy val: imp_ctrl1 %x, tune1 %x, tune2 %x, tune4 %x, bias_control2 %x\n",
+		__func__,
+		(readl_relaxed(qphy->base + 0x220) & 0xff),
+		(readl_relaxed(qphy->base + 0x240) & 0xff),
+		(readl_relaxed(qphy->base + 0x244) & 0xff),
+		(readl_relaxed(qphy->base + 0x24c) & 0xff),
+		(readl_relaxed(qphy->base + 0x198) & 0xff));
 
 	/* Require to get phy pll lock successfully */
 	usleep_range(150, 160);
@@ -854,7 +884,8 @@ static int qusb_phy_notify_disconnect(struct usb_phy *phy,
 							qphy->cable_connected);
 	return 0;
 }
-
+// Samsung will not use qusb_phy_disable_chirp
+/*
 static int qusb_phy_disable_chirp(struct usb_phy *phy, bool disable)
 {
 	struct qusb_phy *qphy = container_of(phy, struct qusb_phy, phy);
@@ -900,7 +931,7 @@ done:
 	mutex_unlock(&qphy->lock);
 	return ret;
 }
-
+*/
 static int qusb_phy_dpdm_regulator_enable(struct regulator_dev *rdev)
 {
 	int ret = 0;
@@ -1348,8 +1379,9 @@ skip_pinctrl_config:
 	 * qusb_phy_disable_chirp is not required if soc version is
 	 * mentioned and is not base version.
 	 */
-	if (!qphy->soc_min_rev)
-		qphy->phy.disable_chirp	= qusb_phy_disable_chirp;
+// Samsung will not use qusb_phy_disable_chirp
+//	if (!qphy->soc_min_rev)
+//		qphy->phy.disable_chirp	= qusb_phy_disable_chirp;
 
 	qphy->phy.start_port_reset	= qusb_phy_enable_ext_pulldown;
 

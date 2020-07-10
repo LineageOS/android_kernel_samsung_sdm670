@@ -59,6 +59,10 @@
 #define MEM_PROTECT_SD_CTRL_SWITCH 0x18
 #define MDP_DEVICE_ID            0x1A
 
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+#include <linux/sec_debug.h>
+#endif
+
 static const char * const iommu_ports[] = {
 		"mdp_0",
 };
@@ -833,6 +837,13 @@ static int _sde_kms_release_splash_buffer(unsigned int mem_addr,
 	if (!mem_addr || !size)
 		SDE_ERROR("invalid params\n");
 
+#if defined(CONFIG_DISPLAY_SAMSUNG) && defined(CONFIG_SEC_DEBUG)
+	if (sec_debug_is_enabled()) {
+		pr_info("skip to free splash memory\n");
+		return 0;
+	}
+#endif
+
 	pfn_start = mem_addr >> PAGE_SHIFT;
 	pfn_end = (mem_addr + size) >> PAGE_SHIFT;
 
@@ -841,6 +852,7 @@ static int _sde_kms_release_splash_buffer(unsigned int mem_addr,
 		SDE_ERROR("continuous splash memory free failed:%d\n", ret);
 		return ret;
 	}
+	free_memsize_reserved(mem_addr, size);
 	for (pfn_idx = pfn_start; pfn_idx < pfn_end; pfn_idx++)
 		free_reserved_page(pfn_to_page(pfn_idx));
 
@@ -2651,11 +2663,11 @@ static int sde_kms_cont_splash_config(struct msm_kms *kms)
 	for (i = 0; i < sde_kms->dsi_display_count; ++i) {
 		display = sde_kms->dsi_displays[i];
 		dsi_display = (struct dsi_display *)display;
-		SDE_DEBUG("display->name = %s\n", dsi_display->name);
+		SDE_ERROR("display->name = %s\n", dsi_display->name);
 
 		if (dsi_display->bridge->base.encoder) {
 			encoder = dsi_display->bridge->base.encoder;
-			SDE_DEBUG("encoder name = %s\n", encoder->name);
+			SDE_ERROR("encoder name = %s\n", encoder->name);
 		}
 		memset(&info, 0x0, sizeof(info));
 		rc = dsi_display_get_info(&info, display);
@@ -2664,7 +2676,7 @@ static int sde_kms_cont_splash_config(struct msm_kms *kms)
 			encoder = NULL;
 			continue;
 		}
-		SDE_DEBUG("info.is_connected = %s, info.is_primary = %s\n",
+		SDE_ERROR("info.is_connected = %s, info.is_primary = %s\n",
 			((info.is_connected) ? "true" : "false"),
 			((info.is_primary) ? "true" : "false"));
 
@@ -2686,7 +2698,7 @@ static int sde_kms_cont_splash_config(struct msm_kms *kms)
 	priv = sde_kms->dev->dev_private;
 	encoder->crtc = priv->crtcs[0];
 	crtc = encoder->crtc;
-	SDE_DEBUG("crtc id = %d\n", crtc->base.id);
+	SDE_ERROR("crtc id = %d\n", crtc->base.id);
 
 
 	mutex_lock(&dev->mode_config.mutex);
@@ -2729,7 +2741,8 @@ static int sde_kms_cont_splash_config(struct msm_kms *kms)
 	/* currently consider modes[0] as the preferred mode */
 	drm_mode = list_first_entry(&connector->modes,
 					struct drm_display_mode, head);
-	SDE_DEBUG("drm_mode->name = %s, id=%d, type=0x%x, flags=0x%x\n",
+
+	SDE_ERROR("drm_mode->name = %s, id=%d, type=0x%x, flags=0x%x\n",
 			drm_mode->name, drm_mode->base.id,
 			drm_mode->type, drm_mode->flags);
 
@@ -2940,6 +2953,11 @@ static int sde_kms_pm_resume(struct device *dev)
 	return 0;
 }
 
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+extern int ss_dsi_panel_event_handler(
+		int display_ndx, enum mdss_intf_events event, void *arg);
+#endif
+
 static const struct msm_kms_funcs kms_funcs = {
 	.hw_init         = sde_kms_hw_init,
 	.postinit        = sde_kms_postinit,
@@ -2969,6 +2987,10 @@ static const struct msm_kms_funcs kms_funcs = {
 	.get_address_space = _sde_kms_get_address_space,
 	.postopen = _sde_kms_post_open,
 	.check_for_splash = sde_kms_check_for_splash,
+
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+	.ss_callback	= ss_dsi_panel_event_handler,
+#endif
 };
 
 /* the caller api needs to turn on clock before calling it */
@@ -3507,6 +3529,8 @@ struct msm_kms *sde_kms_init(struct drm_device *dev)
 {
 	struct msm_drm_private *priv;
 	struct sde_kms *sde_kms;
+
+	pr_err("%s ++ \n", __func__);
 
 	if (!dev || !dev->dev_private) {
 		SDE_ERROR("drm device node invalid\n");
