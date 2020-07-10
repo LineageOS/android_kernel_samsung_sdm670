@@ -29,6 +29,10 @@
 #include <ipc/apr_tal.h>
 #include "adsp_err.h"
 
+#ifdef CONFIG_SEC_SND_ADAPTATION
+#include <dsp/sec_adaptation.h>
+#endif /* CONFIG_SEC_SND_ADAPTATION */
+
 #define TIMEOUT_MS 300
 
 
@@ -142,6 +146,13 @@ static int voice_send_get_source_tracking_cmd(struct voice_data *v,
 			struct source_tracking_param *sourceTrackingData);
 
 static void voice_vote_powerstate_to_bms(struct voice_data *v, bool state);
+
+#ifdef CONFIG_SEC_SND_ADAPTATION
+struct common_data *voice_get_common_data(void)
+{
+	return &common;
+}
+#endif /* CONFIG_SEC_SND_ADAPTATION */
 
 static void voice_itr_init(struct voice_session_itr *itr,
 			   u32 session_id)
@@ -3147,7 +3158,7 @@ static int voice_send_cvp_register_cal_cmd(struct voice_data *v)
 				cal_block->cal_info)->tx_acdb_id;
 	v->dev_rx.dev_id = ((struct audio_cal_info_vocproc *)
 				cal_block->cal_info)->rx_acdb_id;
-	pr_debug("%s: %s: Tx acdb id = %d and Rx acdb id = %d", __func__,
+	pr_info("%s: %s: Tx acdb id = %d and Rx acdb id = %d", __func__,
 		 voc_get_session_name(v->session_id), v->dev_tx.dev_id,
 		 v->dev_rx.dev_id);
 
@@ -6910,6 +6921,10 @@ int voc_end_voice_call(uint32_t session_id)
 	if (v->voc_state == VOC_RUN || v->voc_state == VOC_ERROR ||
 	    v->voc_state == VOC_CHANGE || v->voc_state == VOC_STANDBY) {
 
+#ifdef CONFIG_SEC_SND_ADAPTATION
+		voice_sec_loopback_end_cmd(session_id);
+#endif /* CONFIG_SEC_SND_ADAPTATION */
+
 		pr_debug("%s: VOC_STATE: %d\n", __func__, v->voc_state);
 
 		ret = voice_destroy_vocproc(v);
@@ -7308,6 +7323,10 @@ int voc_start_voice_call(uint32_t session_id)
 			goto fail;
 		}
 
+#ifdef CONFIG_SEC_SND_ADAPTATION
+		voice_sec_loopback_start_cmd(session_id);
+#endif /* CONFIG_SEC_SND_ADAPTATION */
+
 		v->voc_state = VOC_RUN;
 	} else {
 		pr_err("%s: Error: Start voice called in state %d\n",
@@ -7427,7 +7446,7 @@ EXPORT_SYMBOL(voc_config_vocoder);
 
 static int32_t qdsp_mvm_callback(struct apr_client_data *data, void *priv)
 {
-	uint32_t *ptr = NULL, min_payload_size = 0;
+	uint32_t *ptr = NULL;
 	struct common_data *c = NULL;
 	struct voice_data *v = NULL;
 	struct vss_evt_voice_activity *voice_act_update = NULL;
@@ -7498,7 +7517,7 @@ static int32_t qdsp_mvm_callback(struct apr_client_data *data, void *priv)
 	}
 
 	if (data->opcode == APR_BASIC_RSP_RESULT) {
-		if (data->payload_size >= sizeof(ptr[0]) * 2) {
+		if (data->payload_size) {
 			ptr = data->payload;
 
 			pr_debug("%x %x\n", ptr[0], ptr[1]);
@@ -7568,13 +7587,7 @@ static int32_t qdsp_mvm_callback(struct apr_client_data *data, void *priv)
 	} else if (data->opcode == VSS_IMEMORY_RSP_MAP) {
 		pr_debug("%s, Revd VSS_IMEMORY_RSP_MAP response\n", __func__);
 
-		if (data->payload_size < sizeof(ptr[0])) {
-			pr_err("%s: payload has invalid size[%d]\n", __func__,
-			       data->payload_size);
-			return -EINVAL;
-		}
-
-		if (data->token == VOIP_MEM_MAP_TOKEN) {
+		if (data->payload_size && data->token == VOIP_MEM_MAP_TOKEN) {
 			ptr = data->payload;
 			if (ptr[0]) {
 				v->shmem_info.mem_handle = ptr[0];
@@ -7641,13 +7654,10 @@ static int32_t qdsp_mvm_callback(struct apr_client_data *data, void *priv)
 		pr_debug("%s: Received VSS_IVERSION_RSP_GET\n", __func__);
 
 		if (data->payload_size) {
-			min_payload_size = min_t(u32, (int)data->payload_size,
-					       CVD_VERSION_STRING_MAX_SIZE);
 			version_rsp =
 				(struct vss_iversion_rsp_get_t *)data->payload;
 			memcpy(common.cvd_version, version_rsp->version,
-			       min_payload_size);
-			common.cvd_version[min_payload_size - 1] = '\0';
+			       CVD_VERSION_STRING_MAX_SIZE);
 			pr_debug("%s: CVD Version = %s\n",
 				 __func__, common.cvd_version);
 
@@ -7849,7 +7859,7 @@ static int32_t qdsp_cvs_callback(struct apr_client_data *data, void *priv)
 		cvs_voc_pkt = v->shmem_info.sh_buf.buf[1].data;
 		if (cvs_voc_pkt != NULL &&  common.mvs_info.ul_cb != NULL) {
 			if (v->shmem_info.sh_buf.buf[1].size <
-			    ((3 * sizeof(uint32_t)) + cvs_voc_pkt[2])) {
+				((3 * sizeof(uint32_t)) + cvs_voc_pkt[2])) {
 				pr_err("%s: invalid voc pkt size\n", __func__);
 				return -EINVAL;
 			}
@@ -8023,7 +8033,7 @@ static int32_t qdsp_cvp_callback(struct apr_client_data *data, void *priv)
 	}
 
 	if (data->opcode == APR_BASIC_RSP_RESULT) {
-		if (data->payload_size) {
+		if (data->payload_size >= (2 * sizeof(uint32_t))) {
 			ptr = data->payload;
 
 			pr_debug("%x %x\n", ptr[0], ptr[1]);

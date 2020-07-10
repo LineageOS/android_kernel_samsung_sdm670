@@ -46,6 +46,10 @@
 #include <asm/sysreg.h>
 #include <trace/events/exception.h>
 
+#include <linux/sec_debug.h>
+#include <linux/sec_debug_summary.h>
+#include <linux/sec_debug_user_reset.h>
+
 static const char *handler[]= {
 	"Synchronous Abort",
 	"IRQ",
@@ -256,6 +260,17 @@ static int __die(const char *str, int err, struct pt_regs *regs)
 		 end_of_stack(tsk));
 
 	if (!user_mode(regs)) {
+#ifdef CONFIG_SEC_DEBUG
+		if (THREAD_SIZE + (unsigned long)task_stack_page(tsk) - regs->sp
+			> THREAD_SIZE) {
+			dump_mem(KERN_EMERG, "Stack: ", regs->sp,
+					THREAD_SIZE / 4 + regs->sp);
+		} else {
+			dump_mem(KERN_EMERG, "Stack: ", regs->sp, THREAD_SIZE
+					+ (unsigned long)task_stack_page(tsk));
+		}
+#endif
+
 		dump_backtrace(regs, tsk);
 		dump_instr(KERN_EMERG, regs);
 	}
@@ -273,6 +288,7 @@ static unsigned long oops_begin(void)
 	unsigned long flags;
 
 	oops_enter();
+	secdbg_sched_msg("!!die!!");
 
 	/* racy, but better than risking deadlock. */
 	raw_local_irq_save(flags);
@@ -326,6 +342,8 @@ void die(const char *str, struct pt_regs *regs, int err)
 		bug_type = report_bug(regs->pc, regs);
 	if (bug_type != BUG_TRAP_TYPE_NONE && !strlen(str))
 		str = "Oops - BUG";
+
+	sec_debug_save_die_info(str, regs);
 
 	ret = __die(str, err, regs);
 
@@ -800,6 +818,9 @@ const char *esr_get_class_string(u32 esr)
 asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
 {
 	console_verbose();
+
+	sec_debug_save_badmode_info(reason, handler[reason],
+			esr, esr_get_class_string(esr));
 
 	pr_crit("Bad mode in %s handler detected on CPU%d, code 0x%08x -- %s\n",
 		handler[reason], smp_processor_id(), esr,
