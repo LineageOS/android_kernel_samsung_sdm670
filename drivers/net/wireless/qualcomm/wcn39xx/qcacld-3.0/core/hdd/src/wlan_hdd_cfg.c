@@ -43,6 +43,11 @@
 #include "wlan_hdd_green_ap_cfg.h"
 #include "wlan_hdd_twt.h"
 
+#ifdef SEC_CONFIG_POWER_BACKOFF
+bool wlan_hdd_sec_get_grip_power(unsigned int *grip_power_2g, unsigned int *grip_power_5g);
+#define MAX_RETRY 5
+#endif /* SEC_CONFIG_POWER_BACKOFF */
+
 static void
 cb_notify_set_roam_prefer5_g_hz(struct hdd_context *hdd_ctx,
 				unsigned long notify_id)
@@ -6441,6 +6446,46 @@ static QDF_STATUS update_mac_from_string(struct hdd_context *hdd_ctx,
 	return status;
 }
 
+#ifdef SEC_CONFIG_POWER_BACKOFF
+#define SEC_GRIPPOWER_FILEPATH	"/vendor/firmware/wlan/qca_cld/grippower.info"
+bool wlan_hdd_sec_get_grip_power(unsigned int *grip_power_2g, unsigned int *grip_power_5g)
+{
+	struct file *fp = NULL;
+	char *filepath = SEC_GRIPPOWER_FILEPATH;
+	char buf[16] = {0};
+	int i;
+	bool status = false;
+	mm_segment_t oldfs = {0};
+
+	oldfs = get_fs();
+	set_fs(get_ds());
+
+	for (i = 0; i < 5; ++i) {
+		fp = filp_open(filepath, O_RDONLY, 0);
+		if (IS_ERR(fp)) {
+			hdd_debug("can't open file : %s", SEC_GRIPPOWER_FILEPATH);
+		} else {
+			if (vfs_read(fp, buf, strlen(buf), &fp->f_pos) < 0) {
+				hdd_debug("can't read file : %s", SEC_GRIPPOWER_FILEPATH);
+				filp_close(fp, NULL);
+				continue;
+			} else {
+				sscanf(buf, "%d:%d", (unsigned int *)grip_power_2g, (unsigned int *)grip_power_5g);
+				hdd_debug("[WIFI] GRIPPOWER : [%u:%u]", *grip_power_2g, *grip_power_5g);
+				printk("[WIFI] GRIPPOWER: [%u:%u]\n", *grip_power_2g, *grip_power_5g);
+				status = true;
+			}
+			break;
+		}
+	}
+	if (fp && !IS_ERR(fp))
+		filp_close(fp, NULL);
+	set_fs(oldfs);
+
+	return status;
+}
+#endif /* SEC_CONFIG_POWER_BACKOFF */
+
 /**
  * hdd_apply_cfg_ini() - apply the ini configuration file
  * @hdd_ctx: the pointer to hdd context
@@ -6470,6 +6515,9 @@ static QDF_STATUS hdd_apply_cfg_ini(struct hdd_context *hdd_ctx,
 	uint32_t cbOutString;
 	int i;
 	int rv;
+#ifdef SEC_CONFIG_PSM_SYSFS
+	int is_rfmode_off = wlan_hdd_sec_get_psm();
+#endif /* SEC_CONFIG_PSM_SYSFS */
 
 	BUILD_BUG_ON(MAX_CFG_INI_ITEMS < cRegTableEntries);
 
@@ -6546,6 +6594,38 @@ static QDF_STATUS hdd_apply_cfg_ini(struct hdd_context *hdd_ctx,
 					value = pRegEntry->VarDefault;
 				}
 			}
+#ifdef SEC_CONFIG_PSM_SYSFS
+			if (!strcmp(pRegEntry->RegName, CFG_ENABLE_IMPS_NAME) || !strcmp(pRegEntry->RegName, CFG_ENABLE_PS_NAME)) {
+				printk("[WIFI] %s: original_value  = %u", pRegEntry->RegName, value);
+				if(!is_rfmode_off)
+					value = 0;
+				printk("[WIFI] %s: sec_control_psm = %u", pRegEntry->RegName, value);
+			}
+			// newly added for LFR enabling,disabling.
+			if (!strcmp(pRegEntry->RegName, CFG_LFR_FEATURE_ENABLED_NAME) ||
+				!strcmp(pRegEntry->RegName, CFG_FAST_TRANSITION_ENABLED_NAME) ||
+				!strcmp(pRegEntry->RegName, CFG_ENABLE_HOST_ARPOFFLOAD_NAME)) {
+				printk("[WIFI] %s: original_value  = %u", pRegEntry->RegName, value);
+				if(!is_rfmode_off)
+					value = 0;
+				printk("[WIFI] %s: sec_control_psm = %u", pRegEntry->RegName, value);
+			}
+			// newly added for DBS enabling,disabling.
+			if (!strcmp(pRegEntry->RegName, CFG_DUAL_MAC_FEATURE_DISABLE)) {
+				printk("[WIFI] %s: original_value  = %u", pRegEntry->RegName, value);
+				if(!is_rfmode_off)
+					value = 1;
+				printk("[WIFI] %s: sec_control_psm = %u", pRegEntry->RegName, value);
+			}
+			// newly added for abg tx_chains.
+			if (!strcmp(pRegEntry->RegName, CFG_11B_NUM_TX_CHAIN_NAME)) {
+				printk("[WIFI] %s: original_value  = %u", pRegEntry->RegName, value);
+				if(!is_rfmode_off)
+					value = 2;
+				printk("[WIFI] %s: sec_control_psm = %u", pRegEntry->RegName, value);
+			}
+#endif /* SEC_CONFIG_PSM_SYSFS */
+
 			/* Move the variable into the output field. */
 			memcpy(pField, &value, pRegEntry->VarSize);
 		} else if (WLAN_PARAM_SignedInteger == pRegEntry->RegType) {

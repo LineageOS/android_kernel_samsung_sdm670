@@ -27,29 +27,29 @@
 				pins = "ufs_reset";
 				bias-pull-down;		/* default: pull down */
 				/*
-				 * UFS_RESET driver strengths are having
-				 * different values/steps compared to typical
-				 * GPIO drive strengths.
-				 *
-				 * Following table clarifies:
-				 *
-				 * HDRV value | UFS_RESET | Typical GPIO
-				 *   (dec)    |   (mA)    |    (mA)
-				 *     0      |   0.8     |    2
-				 *     1      |   1.55    |    4
-				 *     2      |   2.35    |    6
-				 *     3      |   3.1     |    8
-				 *     4      |   3.9     |    10
-				 *     5      |   4.65    |    12
-				 *     6      |   5.4     |    14
-				 *     7      |   6.15    |    16
-				 *
-				 * POR value for UFS_RESET HDRV is 3 which means
-				 * 3.1mA and we want to use that. Hence just
-				 * specify 8mA to "drive-strength" binding and
-				 * that should result into writing 3 to HDRV
-				 * field.
-				 */
+				* UFS_RESET driver strengths are having
+				* different values/steps compared to typical
+				* GPIO drive strengths.
+				*
+				* Following table clarifies:
+				*
+				* HDRV value | UFS_RESET | Typical GPIO
+				*   (dec)    |   (mA)    |    (mA)
+				*     0      |   0.8     |    2
+				*     1      |   1.55    |    4
+				*     2      |   2.35    |    6
+				*     3      |   3.1     |    8
+				*     4      |   3.9     |    10
+				*     5      |   4.65    |    12
+				*     6      |   5.4     |    14
+				*     7      |   6.15    |    16
+				*
+				* POR value for UFS_RESET HDRV is 3 which means
+				* 3.1mA and we want to use that. Hence just
+				* specify 8mA to "drive-strength" binding and
+				* that should result into writing 3 to HDRV
+				* field.
+				*/
 				drive-strength = <8>;	/* default: 3.1 mA */
 				output-low; /* active low reset */
 			};
@@ -244,7 +244,7 @@
 				config {
 					pins = "gpio27", "gpio28";
 					drive-strength = <2>;
-					bias-pull-up;
+					bias-disable;
 				};
 			};
 		};
@@ -964,12 +964,12 @@
 		qupv3_se12_i2c_pins: qupv3_se12_i2c_pins {
 			qupv3_se12_i2c_active: qupv3_se12_i2c_active {
 				mux {
-					pins = "gpio49", "gpio50";
+					pins = "gpio49";
 					function = "qup12";
 				};
 
 				config {
-					pins = "gpio49", "gpio50";
+					pins = "gpio49";
 					drive-strength = <2>;
 					bias-disable;
 				};
@@ -977,12 +977,12 @@
 
 			qupv3_se12_i2c_sleep: qupv3_se12_i2c_sleep {
 				mux {
-					pins = "gpio49", "gpio50";
+					pins = "gpio49";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio49", "gpio50";
+					pins = "gpio49";
 					drive-strength = <2>;
 					bias-pull-up;
 				};
@@ -1020,13 +1020,13 @@
 		qupv3_se12_spi_pins: qupv3_se12_spi_pins {
 			qupv3_se12_spi_active: qupv3_se12_spi_active {
 				mux {
-					pins = "gpio49", "gpio50", "gpio51",
+					pins = "gpio49", "gpio51",
 								"gpio52";
 					function = "qup12";
 				};
 
 				config {
-					pins = "gpio49", "gpio50", "gpio51",
+					pins = "gpio49", "gpio51",
 								"gpio52";
 					drive-strength = <6>;
 					bias-disable;
@@ -1035,13 +1035,13 @@
 
 			qupv3_se12_spi_sleep: qupv3_se12_spi_sleep {
 				mux {
-					pins = "gpio49", "gpio50", "gpio51",
+					pins = "gpio49", "gpio51",
 								"gpio52";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio49", "gpio50", "gpio51",
+					pins = "gpio49", "gpio51",
 								"gpio52";
 					drive-strength = <6>;
 					bias-disable;
@@ -1251,7 +1251,7 @@
 		sdc1_cmd_on: sdc1_cmd_on {
 			config {
 				pins = "sdc1_cmd";
-				bias-pull-up;		/* pull up */
+				bias-disable;		/* NO pull */
 				drive-strength = <10>;	/* 10 MA */
 			};
 		};
@@ -1260,7 +1260,7 @@
 			config {
 				pins = "sdc1_cmd";
 				num-grp-pins = <1>;
-				bias-pull-up;		/* pull up */
+				bias-disable;		/* NO pull */
 				drive-strength = <2>;	/* 2 MA */
 			};
 		};
@@ -1352,7 +1352,7 @@
 			config {
 				pins = "gpio96";
 				drive-strength = <2>;
-				bias-pull-up;
+				bias-disable;
 			};
 		};
 
@@ -1996,12 +1996,12 @@
 
 		sde_dp_aux_active: sde_dp_aux_active {
 			mux {
-				pins = "gpio40", "gpio50";
+				pins = "gpio40";
 				function = "gpio";
 			};
 
 			config {
-				pins = "gpio40", "gpio50";
+				pins = "gpio40";
 				bias-disable = <0>; /* no pull */
 				drive-strength = <8>;
 			};
@@ -2009,12 +2009,12 @@
 
 		sde_dp_aux_suspend: sde_dp_aux_suspend {
 			mux {
-				pins = "gpio40", "gpio50";
+				pins = "gpio40";
 				function = "gpio";
 			};
 
 			config {
-				pins = "gpio40", "gpio50";
+				pins = "gpio40";
 				bias-pull-down;
 				drive-strength = <2>;
 			};
@@ -2055,7 +2055,7 @@
 
 			config {
 				pins = "gpio17","gpio18";
-				bias-pull-up; /* PULL UP*/
+				bias-disable; /* PULL UP*/
 				drive-strength = <2>; /* 2 MA */
 			};
 		};
@@ -2069,7 +2069,7 @@
 
 			config {
 				pins = "gpio17","gpio18";
-				bias-pull-down; /* PULL DOWN */
+				bias-disable; /* PULL DOWN */
 				drive-strength = <2>; /* 2 MA */
 			};
 		};
@@ -2083,7 +2083,7 @@
 
 			config {
 				pins = "gpio19","gpio20";
-				bias-pull-up; /* PULL UP*/
+				bias-disable; /* PULL UP*/
 				drive-strength = <2>; /* 2 MA */
 			};
 		};
@@ -2097,7 +2097,7 @@
 
 			config {
 				pins = "gpio19","gpio20";
-				bias-pull-down; /* PULL DOWN */
+				bias-disable; /* PULL DOWN */
 				drive-strength = <2>; /* 2 MA */
 			};
 		};
@@ -2405,6 +2405,24 @@
 			power-source = <0>;
 		};
 	};
+	key_home {
+		key_home_default: key_home_default {
+			pins = "gpio4";
+			function = "normal";
+			input-enable;
+			bias-pull-up;
+			power-source = <0>;
+		};
+	};
+	key_func {
+		key_func_default: key_func_default {
+			pins = "gpio2";
+			function = "normal";
+			input-enable;
+			bias-pull-up;
+			power-source = <0>;
+		};
+	};
 };
 
 &pm660_gpios {
@@ -2422,5 +2440,19 @@
 		power-source = <0>;
 		qcom,drive-strength = <3>;
 		output-high;
+	};
+	key_back_default: key_back_default {
+		pins = "gpio3";
+		function = "normal";
+		input-enable;
+		bias-pull-up;
+		power-source = <0>;
+	};
+	key_recent_default: key_recent_default {
+		pins = "gpio13";
+		function = "normal";
+		input-enable;
+		bias-pull-up;
+		power-source = <0>;
 	};
 };

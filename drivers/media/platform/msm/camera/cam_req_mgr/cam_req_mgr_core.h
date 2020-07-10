@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -47,7 +47,6 @@ enum crm_workq_task_type {
 	CRM_WORKQ_TASK_APPLY_REQ,
 	CRM_WORKQ_TASK_NOTIFY_SOF,
 	CRM_WORKQ_TASK_NOTIFY_ERR,
-	CRM_WORKQ_TASK_NOTIFY_FREEZE,
 	CRM_WORKQ_TASK_SCHED_REQ,
 	CRM_WORKQ_TASK_FLUSH_REQ,
 	CRM_WORKQ_TASK_INVALID,
@@ -129,16 +128,13 @@ enum cam_req_mgr_link_state {
 
 /**
  * struct cam_req_mgr_traverse
- * @idx              : slot index
- * @result           : contains which all tables were able to apply successfully
- * @tbl              : pointer of pipeline delay based request table
- * @apply_data       : pointer which various tables will update during traverse
- * @in_q             : input request queue pointer
- * @validate_only    : Whether to validate only and/or update settings
- * @self_link        : To indicate whether the check is for the given link or
- *                     the other sync link
- * @inject_delay_chk : if inject delay has been validated for all pd devices
- * @open_req_cnt     : Count of open requests yet to be serviced in the kernel.
+ * @idx           : slot index
+ * @result        : contains which all tables were able to apply successfully
+ * @tbl           : pointer of pipeline delay based request table
+ * @apply_data    : pointer which various tables will update during traverse
+ * @in_q          : input request queue pointer
+ * @validate_only : Whether to validate only and/or update settings
+ * @open_req_cnt  : Count of open requests yet to be serviced in the kernel.
  */
 struct cam_req_mgr_traverse {
 	int32_t                       idx;
@@ -147,9 +143,7 @@ struct cam_req_mgr_traverse {
 	struct cam_req_mgr_apply     *apply_data;
 	struct cam_req_mgr_req_queue *in_q;
 	bool                          validate_only;
-	bool                          self_link;
-	bool                          inject_delay_chk;
-	int32_t                       open_req_cnt;
+	int32_t                      open_req_cnt;
 };
 
 /**
@@ -171,13 +165,11 @@ struct cam_req_mgr_apply {
  * @idx           : slot index
  * @req_ready_map : mask tracking which all devices have request ready
  * @state         : state machine for life cycle of a slot
- * @inject_delay  : insert extra bubbling for flash type of use cases
  */
 struct cam_req_mgr_tbl_slot {
 	int32_t             idx;
 	uint32_t            req_ready_map;
 	enum crm_req_state  state;
-	uint32_t            inject_delay;
 };
 
 /**
@@ -206,10 +198,27 @@ struct cam_req_mgr_req_tbl {
 };
 
 /**
+ *  struct cam_req_mgr_skip_frame
+ *  @inject_delay    : inject delay to skip before apply
+ *  @dev_hdl         : device handle which is adding inject delay
+ *  @skip_next_frame : skip next frame flag to skip send request other
+ *                     than device which is adding inject delay
+ *  @is_applied      : flag to skip the device to send the request which already
+ *                     applied
+ */
+struct cam_req_mgr_skip_frame {
+	int32_t		inject_delay;
+	int32_t		dev_hdl;
+	bool		skip_next_frame;
+	bool		is_applied;
+};
+
+/**
  * struct cam_req_mgr_slot
  * - Internal Book keeping
  * @idx          : slot index
  * @skip_idx     : if req id in this slot needs to be skipped/not applied
+ * @skip_frm     : insert extra bubble for flash type of usecase
  * @status       : state machine for life cycle of a slot
  * - members updated due to external events
  * @recover      : if user enabled recovery for this request.
@@ -217,12 +226,13 @@ struct cam_req_mgr_req_tbl {
  * @sync_mode    : Sync mode in which req id in this slot has to applied
  */
 struct cam_req_mgr_slot {
-	int32_t               idx;
-	int32_t               skip_idx;
-	enum crm_slot_status  status;
-	int32_t               recover;
-	int64_t               req_id;
-	int32_t               sync_mode;
+	int32_t                        idx;
+	int32_t                        skip_idx;
+	struct cam_req_mgr_skip_frame  skip_frm[CAM_PIPELINE_DELAY_MAX];
+	enum crm_slot_status           status;
+	int32_t                        recover;
+	int64_t                        req_id;
+	int32_t                        sync_mode;
 };
 
 /**
@@ -310,6 +320,8 @@ struct cam_req_mgr_connected_device {
  *                         frame in sync link as well.
  * @open_req_cnt         : Counter to keep track of open requests that are yet
  *                         to be serviced in the kernel.
+ * @last_flush_id        : Last request to flush
+ * @is_used              : 1 if link is in use else 0
  *
  */
 struct cam_req_mgr_core_link {
@@ -334,6 +346,8 @@ struct cam_req_mgr_core_link {
 	bool                                 frame_skip_flag;
 	bool                                 sync_link_sof_skip;
 	int32_t                              open_req_cnt;
+	uint32_t                             last_flush_id;
+    atomic_t                             is_used;
 };
 
 /**
