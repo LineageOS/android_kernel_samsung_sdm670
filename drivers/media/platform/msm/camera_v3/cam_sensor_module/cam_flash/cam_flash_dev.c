@@ -71,7 +71,7 @@ static int32_t cam_flash_driver_cmd(struct cam_flash_ctrl *fctrl,
 		bridge_params.v4l2_sub_dev_flag = 0;
 		bridge_params.media_entity_flag = 0;
 		bridge_params.priv = fctrl;
-		bridge_params.dev_id = CAM_FLASH;
+
 		flash_acq_dev.device_handle =
 			cam_create_device_hdl(&bridge_params);
 		fctrl->bridge_intf.device_hdl =
@@ -181,9 +181,7 @@ static int32_t cam_flash_driver_cmd(struct cam_flash_ctrl *fctrl,
 			goto release_mutex;
 		}
 
-		cam_flash_off(fctrl);
 		fctrl->func_tbl.flush_req(fctrl, FLUSH_ALL, 0);
-		fctrl->last_flush_req = 0;
 		fctrl->flash_state = CAM_FLASH_STATE_ACQUIRE;
 		break;
 	}
@@ -320,6 +318,7 @@ static int cam_flash_platform_remove(struct platform_device *pdev)
 		return 0;
 	}
 
+	devm_kfree(&pdev->dev, fctrl);
 	CAM_INFO(CAM_FLASH, "Platform remove invoked");
 	mutex_lock(&fctrl->flash_mutex);
 	cam_flash_shutdown(fctrl);
@@ -387,8 +386,6 @@ static int cam_flash_init_subdev(struct cam_flash_ctrl *fctrl)
 {
 	int rc = 0;
 
-	strlcpy(fctrl->device_name, CAM_FLASH_NAME,
-		sizeof(fctrl->device_name));
 	fctrl->v4l2_dev_str.internal_ops =
 		&cam_flash_internal_ops;
 	fctrl->v4l2_dev_str.ops = &cam_flash_subdev_ops;

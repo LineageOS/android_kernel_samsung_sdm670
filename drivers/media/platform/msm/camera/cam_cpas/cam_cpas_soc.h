@@ -17,6 +17,7 @@
 #include "cam_cpas_hw.h"
 
 #define CAM_REGULATOR_LEVEL_MAX 16
+
 /**
  * struct cam_cpas_vdd_ahb_mapping : Voltage to ahb level mapping
  *
@@ -41,17 +42,11 @@ struct cam_cpas_vdd_ahb_mapping {
  * @axi_port_list_node : Node representing AXI Ports list
  * @num_vdd_ahb_mapping : Number of vdd to ahb level mapping supported
  * @vdd_ahb : AHB level mapping info for the supported vdd levels
- * @soc_id : SOC id
- * @hw_rev : Camera hw revision
- * @control_camnoc_axi_clk : Whether CPAS driver need to set camnoc axi clk freq
- * @camnoc_bus_width : CAMNOC Bus width
- * @camnoc_axi_clk_bw_margin : BW Margin in percentage to add while calculating
- *      camnoc axi clock
- * @camnoc_axi_min_ib_bw: Min camnoc BW which varies based on target
  *
  */
 struct cam_cpas_private_soc {
 	const char *arch_compat;
+	uint32_t hw_version;
 	bool client_id_based;
 	uint32_t num_clients;
 	const char *client_name[CAM_CPAS_MAX_CLIENTS];
