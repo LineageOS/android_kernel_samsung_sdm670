@@ -222,7 +222,6 @@ static struct cam_ife_csid_csi2_rx_reg_offset
 	.csi2_capture_short_pkt_vc_shift              = 15,
 	.csi2_capture_cphy_pkt_dt_shift               = 20,
 	.csi2_capture_cphy_pkt_vc_shift               = 26,
-	.csi2_rx_phy_num_mask                         = 0x3,
 };
 
 static struct cam_ife_csid_csi2_tpg_reg_offset
@@ -293,10 +292,6 @@ static struct cam_ife_csid_common_reg_offset
 	.ppp_irq_mask_all                             = 0x0,
 	.measure_en_hbi_vbi_cnt_mask                  = 0xC,
 	.format_measure_en_val                        = 1,
-	.format_measure_height_mask_val               = 0xFFFF,
-	.format_measure_height_shift_val              = 0x10,
-	.format_measure_width_mask_val                = 0xFFFF,
-	.format_measure_width_shift_val               = 0x0,
 };
 
 static struct cam_ife_csid_reg_offset cam_ife_csid_170_reg_offset = {
