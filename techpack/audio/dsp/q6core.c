@@ -800,7 +800,7 @@ bool q6core_is_adsp_ready(void)
 	bool ret = false;
 	struct apr_hdr hdr;
 
-	pr_debug("%s: enter\n", __func__);
+	pr_info("%s: enter\n", __func__);
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
 				      APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
@@ -828,7 +828,7 @@ bool q6core_is_adsp_ready(void)
 		}
 	}
 bail:
-	pr_debug("%s: leave, rc %d, adsp ready %d\n", __func__, rc, ret);
+	pr_info("%s: leave, rc %d, adsp ready %d\n", __func__, rc, ret);
 	mutex_unlock(&(q6core_lcl.cmd_lock));
 	return ret;
 }

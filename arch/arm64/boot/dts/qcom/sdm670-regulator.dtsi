@@ -595,7 +595,7 @@
 		pm660l_l6: regulator-pm660l-l6 {
 			regulator-name = "pm660l_l6";
 			qcom,set = <RPMH_REGULATOR_SET_ALL>;
-			regulator-min-microvolt = <3008000>;
+			regulator-min-microvolt = <3000000>;
 			regulator-max-microvolt = <3300000>;
 			qcom,init-voltage = <3008000>;
 			qcom,init-mode = <RPMH_REGULATOR_MODE_LPM>;

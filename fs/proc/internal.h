@@ -156,7 +156,8 @@ extern int proc_pid_status(struct seq_file *, struct pid_namespace *,
 			   struct pid *, struct task_struct *);
 extern int proc_pid_statm(struct seq_file *, struct pid_namespace *,
 			  struct pid *, struct task_struct *);
-
+extern int proc_pid_statlmkd(struct seq_file *, struct pid_namespace *,
+			  struct pid *, struct task_struct *);
 /*
  * base.c
  */
@@ -214,7 +215,7 @@ extern const struct file_operations proc_reclaim_operations;
 
 extern void proc_init_inodecache(void);
 extern struct inode *proc_get_inode(struct super_block *, struct proc_dir_entry *);
-extern int proc_fill_super(struct super_block *);
+extern int proc_fill_super(struct super_block *, void *data, int flags);
 extern void proc_entry_rundown(struct proc_dir_entry *);
 
 /*
@@ -281,6 +282,7 @@ static inline void proc_tty_init(void) {}
  * root.c
  */
 extern struct proc_dir_entry proc_root;
+extern int proc_parse_options(char *options, struct pid_namespace *pid);
 
 extern void proc_self_init(void);
 extern int proc_remount(struct super_block *, int *, char *);
@@ -317,5 +319,7 @@ extern const struct file_operations proc_pagemap_operations;
 extern unsigned long task_vsize(struct mm_struct *);
 extern unsigned long task_statm(struct mm_struct *,
 				unsigned long *, unsigned long *,
+				unsigned long *, unsigned long *);
+extern void task_statlmkd(struct mm_struct *, unsigned long *,
 				unsigned long *, unsigned long *);
 extern void task_mem(struct seq_file *, struct mm_struct *);
