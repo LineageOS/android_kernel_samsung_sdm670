@@ -90,7 +90,7 @@ static char ss_panel_revision(struct samsung_display_driver_data *vdd)
 
 static int ss_manufacture_date_read(struct samsung_display_driver_data *vdd)
 {
-	unsigned char date[4] = {0,};
+	unsigned char date[7] = {0,};
 	int year, month, day;
 	int hour, min;
 
