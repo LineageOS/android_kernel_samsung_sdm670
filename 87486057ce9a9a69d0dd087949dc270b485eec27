@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "6d35652e_ced5ffb4",
+        "filename": "drivers/net/wireless/qualcomm/wcn39xx/qcacld-3.0/Kbuild",
+        "patchSetId": 8
+      },
+      "lineNbr": 2156,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2020-07-11T17:36:10Z",
+      "side": 1,
+      "message": "make[5]: secgetspf: Command not found",
+      "range": {
+        "startLine": 2156,
+        "startChar": 14,
+        "endLine": 2156,
+        "endChar": 23
+      },
+      "revId": "87486057ce9a9a69d0dd087949dc270b485eec27",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
