@@ -14249,7 +14249,7 @@ static ssize_t show_wificableinfo(struct kobject *kobj,
 {
 	struct device_node *np;
 	int wifi_cable = 0;
-	char antbuffer[1] = {0};
+	char antbuffer;
 
 	np = of_find_compatible_node(NULL, NULL, "samsung,rome_cable");
 
@@ -14262,7 +14262,7 @@ static ssize_t show_wificableinfo(struct kobject *kobj,
 	printk(KERN_INFO "%s : gpio=%d value = %d \n",__FUNCTION__, wifi_cable, gpio_get_value(wifi_cable)); 
 
 	printk(KERN_ERR "%s : gpio=%d value = %d \n",__FUNCTION__, wifi_cable, gpio_get_value(wifi_cable)); 
-	sprintf(antbuffer, "%c\n", (gpio_get_value(wifi_cable) > 0) ? 'D' : 'E');
+	antbuffer = gpio_get_value(wifi_cable) > 0 ? 'D' : 'E';
 
 	return scnprintf(buf, PAGE_SIZE, "%s", antbuffer);
 }
