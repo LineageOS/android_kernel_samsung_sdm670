@@ -187,6 +187,7 @@ struct sec_fuelgauge_info {
 	struct wake_lock fuel_alert_wake_lock;
 	unsigned int capacity_old;	/* only for atomic calculation */
 	unsigned int capacity_max;	/* only for dynamic calculation */
+	int raw_capacity;
 #if defined(CONFIG_BATTERY_AGE_FORECAST)
 	unsigned int chg_full_soc; /* BATTERY_AGE_FORECAST */
 #endif

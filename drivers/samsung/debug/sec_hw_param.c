@@ -1295,7 +1295,7 @@ out:
 	kfree(p_rst_exinfo);
 
 	if (offset != 0)
-		seq_printf(m, buf);
+		seq_puts(m, buf);
 
 	return 0;
 }
@@ -1341,7 +1341,7 @@ static int __init sec_hw_param_init(void)
 	struct device *sec_hw_param_dev;
 	struct device *sec_reset_reason_dev;
 	int err_hw_param;
-	int err_errp_extra;
+	int err_errp_extra = 0;
 
 	dbg_partition_notifier_register(&sec_hw_param_dbg_part_notifier);
 
