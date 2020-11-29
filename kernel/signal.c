@@ -1209,9 +1209,8 @@ int do_send_sig_info(int sig, struct siginfo *info, struct task_struct *p,
 #endif
 
 #ifdef CONFIG_SAMSUNG_FREECESS
-	if ((sig == SIGKILL || sig == SIGTERM || sig == SIGABRT)) 
-		sig_report(current, p);
-	
+	if ((sig == SIGKILL || sig == SIGTERM || sig == SIGABRT || sig == SIGQUIT)) 
+		sig_report(p);	
 #endif
 
 	if (lock_task_sighand(p, &flags)) {

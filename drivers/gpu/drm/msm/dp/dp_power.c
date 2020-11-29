@@ -710,6 +710,9 @@ void secdp_config_gpios_factory(int aux_sel, bool on)
 		secdp_aux_pullup_vreg_enable(true);
 
 #ifdef CONFIG_COMBO_REDRIVER
+		/* set aux_sel, aux_en */
+		secdp_power_set_gpio(aux_sel);
+
 		if (aux_sel == 1)
 			secdp_redriver_aux_ctrl(REDRIVER_SWITCH_CROSS);
 		else if (aux_sel == 0)
@@ -723,6 +726,9 @@ void secdp_config_gpios_factory(int aux_sel, bool on)
 	} else {
 #ifdef CONFIG_COMBO_REDRIVER
 		secdp_redriver_aux_ctrl(REDRIVER_SWITCH_RESET);
+
+		/* unset aux_sel, aux_en */
+		secdp_power_unset_gpio();
 #else
 		/* unset aux_sel, aux_en */
 		secdp_power_unset_gpio();

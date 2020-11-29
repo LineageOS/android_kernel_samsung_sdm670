@@ -32,6 +32,8 @@
 #include <linux/sec_smem.h>
 #include <linux/sec_debug.h>
 
+#include <asm/arch_timer.h>
+
 #include "../sec_kcompat.h"
 
 #include <linux/topology.h>
@@ -342,7 +344,7 @@ static void __always_inline __sec_smem_cpuclk_log_raw(size_t slot, unsigned long
 	apps_clk_log_t *log = &clk->log[idx];
 
 	log->ktime = local_clock();
-	log->qtime = arch_counter_get_cntvct();
+	log->qtime = arch_timer_read_counter();
 	log->rate = rate;
 	clk->index = (clk->index + 1) % MAX_CLK_LOG_CNT;
 }

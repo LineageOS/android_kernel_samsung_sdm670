@@ -2085,7 +2085,9 @@ static int sm5705_fg_get_property(struct power_supply *psy, enum power_supply_pr
 		if (val->intval == SEC_FUELGAUGE_CAPACITY_TYPE_RAW) {
 			val->intval = fuelgauge->info.batt_soc * 10;
 			break;
-		} else
+		} else if (val->intval == SEC_FUELGAUGE_CAPACITY_TYPE_DYNAMIC_SCALE) {
+			val->intval = fuelgauge->raw_capacity;
+		} else {
 			val->intval = fuelgauge->info.batt_soc;
 		if (fuelgauge->pdata->capacity_calculation_type &
 			(SEC_FUELGAUGE_CAPACITY_TYPE_SCALE |
@@ -2098,6 +2100,7 @@ static int sm5705_fg_get_property(struct power_supply *psy, enum power_supply_pr
 			val->intval = 1000;
 		if (val->intval < 0)
 			val->intval = 0;
+		fuelgauge->raw_capacity = val->intval;
 		/* get only integer part */
 		val->intval /= 10;
 		/* check whether doing the wake_unlock */
@@ -2124,6 +2127,7 @@ static int sm5705_fg_get_property(struct power_supply *psy, enum power_supply_pr
 			(SEC_FUELGAUGE_CAPACITY_TYPE_ATOMIC |
 			 SEC_FUELGAUGE_CAPACITY_TYPE_SKIP_ABNORMAL))
 			sm5705_fg_get_atomic_capacity(fuelgauge, val);
+		}
 		break;
 	case POWER_SUPPLY_PROP_ENERGY_FULL_DESIGN:
 		val->intval = fuelgauge->capacity_max;

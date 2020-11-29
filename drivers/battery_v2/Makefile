@@ -54,3 +54,4 @@ obj-$(CONFIG_WIRELESS_CHARGER_BQ51221)	+= bq51221_charger.o
 obj-$(CONFIG_WIRELESS_CHARGER_P9220)	+= p9220_charger.o
 obj-$(CONFIG_WIRELESS_CHARGER_MFC)	+= mfc_charger.o
 obj-$(CONFIG_BATTERY_SAMSUNG)	+= sec_battery.o
+obj-$(CONFIG_BATTERY_SAMSUNG)	+= sec_battery_ttf.o
