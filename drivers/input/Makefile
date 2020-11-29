@@ -42,3 +42,4 @@ obj-$(CONFIG_INPUT_KEYCOMBO)	+= keycombo.o
 
 obj-$(CONFIG_SMI130)   += sensors/smi130/
 
+obj-$(CONFIG_SEC_AUTO_INPUT)	+= sec_auto_input.o

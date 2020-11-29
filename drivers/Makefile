@@ -206,3 +206,6 @@ obj-y				+= motor/
 
 # uH                                                                            
 obj-$(CONFIG_UH)        += uh/
+
+#TZIC
+obj-y  += security/samsung/tzic/
