@@ -154,9 +154,13 @@ struct adc_sample_info {
 	int adc_arr[ADC_SAMPLE_COUNT];
 	int index;
 };
+
+struct sec_ttf_data;
+
 struct sec_battery_info {
 	struct device *dev;
 	sec_battery_platform_data_t *pdata;
+	struct sec_ttf_data *ttf_d;
 
 	/* power supply used in Android */
 	struct power_supply *psy_bat;
@@ -403,10 +407,6 @@ struct sec_battery_info {
 #if defined(CONFIG_AFC_CHARGER_MODE)
 	char *hv_chg_name;
 #endif
-#if defined(CONFIG_CALC_TIME_TO_FULL)
-	int timetofull;
-	struct delayed_work timetofull_work;
-#endif
 #if defined(CONFIG_ENABLE_100MA_CHARGING_BEFORE_USB_CONFIGURED)
 	struct delayed_work slowcharging_work;
 #endif
@@ -630,6 +630,9 @@ enum {
 	EXT_DEV_GAMEPAD_CHG,
 	EXT_DEV_GAMEPAD_OTG,
 };
+
+extern unsigned int lpcharge;
+
 extern void select_pdo(int num);
 extern int adc_read(struct sec_battery_info *battery, int channel);
 extern void adc_init(struct platform_device *pdev, struct sec_battery_info *battery);
@@ -648,4 +651,5 @@ extern bool sec_bat_cisd_check(struct sec_battery_info *battery);
 extern void sec_battery_cisd_init(struct sec_battery_info *battery);
 extern void set_cisd_pad_data(struct sec_battery_info *battery, const char* buf);
 #endif
+bool sec_bat_hv_wc_normal_mode_check(struct sec_battery_info *battery);
 #endif /* __SEC_BATTERY_H */

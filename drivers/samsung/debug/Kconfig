@@ -249,3 +249,10 @@ config SEC_NOEYEINFO
 	default n
 	help
 	  This feature enable for no store ddr eye info to ddr eye node
+
+config SEC_QPNP_PON_SPARE_BITS
+	int "The number of available bits in QPNP_PON_SOFT_RB_SPARE register"
+	range 6 7
+	default 7
+	help
+	  The number of available bits in QPNP_PON_SOFT_RB_SPARE register

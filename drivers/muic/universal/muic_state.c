@@ -554,7 +554,7 @@ void muic_detect_dev(muic_data_t *pmuic)
 
 #if defined(CONFIG_MUIC_SUPPORT_KEYBOARDDOCK)
     	/* ADC scan fail */
-	if( (pmuic->intr.intr1==0x01) && (pmuic->intr.intr2==0x00) && (pmuic->intr.intr3==0x00) )
+	if( !lpcharge && (pmuic->intr.intr1==0x01) && (pmuic->intr.intr2==0x00) && (pmuic->intr.intr3==0x00) )
 	{
 		adc_status = muic_i2c_read_byte(i2c, 0x3B);  /* ADC Hit/Fail STATUS[1:0] : 01:Hit, 10:Fail*/
 		pr_info("%s: ADC STATUS(0x3B):0x%x\n", __func__, adc_status);
