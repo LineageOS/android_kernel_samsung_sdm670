@@ -282,10 +282,14 @@ DTC ?= $(objtree)/scripts/dtc/dtc
 ifeq ($(findstring 1,$(KBUILD_ENABLE_EXTRA_GCC_CHECKS)),)
 DTC_FLAGS += -Wno-unit_address_vs_reg \
 	-Wno-unit_address_format \
+	-Wno-reg_format \
+	-Wno-avoid_default_addr_size \
 	-Wno-avoid_unnecessary_addr_size \
 	-Wno-alias_paths \
+	-Wno-gpios_property \
 	-Wno-graph_child_address \
 	-Wno-graph_port \
+	-Wno-interrupts_property \
 	-Wno-unique_unit_address \
 	-Wno-pci_device_reg
 endif
