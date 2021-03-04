@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "b625788d_0ff61f53",
+        "filename": "include/linux/hid.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 886,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2021-03-04T13:50:38Z",
+      "side": 1,
+      "message": "No idea why Samsung skipped this line.",
+      "revId": "f82eb4df62049269c537d30155d9db63d1a1a372",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
