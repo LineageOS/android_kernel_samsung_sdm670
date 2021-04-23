@@ -19,6 +19,10 @@
 #include <linux/clk.h>
 struct clk * xo_chr = NULL;
 #endif
+#if defined(CONFIG_CCIC_S2MM005)
+#include <linux/ccic/s2mm005.h>
+extern struct device *ccic_device;
+#endif
 
 static struct device_attribute sec_battery_attrs[] = {
 	SEC_BATTERY_ATTR(batt_reset_soc),
@@ -202,6 +206,15 @@ static enum power_supply_property sec_battery_props[] = {
 };
 
 static enum power_supply_property sec_power_props[] = {
+	POWER_SUPPLY_PROP_ONLINE,
+	POWER_SUPPLY_PROP_VOLTAGE_MAX,
+	POWER_SUPPLY_PROP_CURRENT_MAX,
+#if defined(CONFIG_CCIC_S2MM005)
+	POWER_SUPPLY_PROP_MOISTURE_DETECTED,
+#endif
+};
+
+static enum power_supply_property sec_pogo_props[] = {
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX,
 	POWER_SUPPLY_PROP_CURRENT_MAX,
@@ -6641,6 +6654,9 @@ static int sec_usb_get_property(struct power_supply *psy,
 				union power_supply_propval *val)
 {
 	struct sec_battery_info *battery = power_supply_get_drvdata(psy);
+#if defined(CONFIG_CCIC_S2MM005)
+	struct s2mm005_data *usbpd_data;
+#endif
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_ONLINE:
@@ -6653,6 +6669,19 @@ static int sec_usb_get_property(struct power_supply *psy,
 		/* mA -> uA */
 		val->intval = battery->pdata->charging_current[battery->cable_type].input_current_limit * 1000;
 		return 0;
+#if defined(CONFIG_CCIC_S2MM005)
+	case POWER_SUPPLY_PROP_MOISTURE_DETECTED: {
+		if (!ccic_device)
+			return -ENODATA;
+
+		usbpd_data = dev_get_drvdata(ccic_device);
+		if (!usbpd_data)
+			return -ENODATA;
+
+		val->intval = (usbpd_data->water_det | !usbpd_data->run_dry);
+		return 0;
+	}
+#endif
 	default:
 		return -EINVAL;
 	}
@@ -9376,8 +9405,8 @@ static const struct power_supply_desc ps_power_supply_desc = {
 static const struct power_supply_desc pogo_power_supply_desc = {
 	.name = "pogo",
 	.type = POWER_SUPPLY_TYPE_POGO,
-	.properties = sec_power_props,
-	.num_properties = ARRAY_SIZE(sec_power_props),
+	.properties = sec_pogo_props,
+	.num_properties = ARRAY_SIZE(sec_pogo_props),
 	.get_property = sec_pogo_get_property,
 	.set_property = sec_pogo_set_property,
 };
