@@ -34,7 +34,6 @@
 #include <linux/stacktrace.h>
 #include <linux/prefetch.h>
 #include <linux/memcontrol.h>
-
 #include <trace/events/kmem.h>
 
 #include "internal.h"
@@ -259,6 +258,7 @@ static inline void *get_freepointer_safe(struct kmem_cache *s, void *object)
 
 static inline void set_freepointer(struct kmem_cache *s, void *object, void *fp)
 {
+
 	*(void **)(object + s->offset) = fp;
 }
 
@@ -730,6 +730,7 @@ static int check_bytes_and_report(struct kmem_cache *s, struct page *page,
 	u8 *end;
 
 	metadata_access_enable();
+
 	fault = memchr_inv(start, value, bytes);
 	metadata_access_disable();
 	if (!fault)
@@ -1265,6 +1266,30 @@ out:
 
 __setup("slub_debug", setup_slub_debug);
 
+static const char *exclusion_list[] = {
+        "zspage",
+        "zs_handle",
+        "zswap_entry",
+        "avtab_node",
+        "vm_area_struct",
+        "anon_vma_chain",
+        "anon_vma"
+};
+
+static int is_kmem_cache_excluded(const char *str)
+{
+        int i, excluded=0;
+
+        for (i = 0; i < ARRAY_SIZE(exclusion_list); i++)
+        {
+                if(!strncmp(str, exclusion_list[i], strlen(exclusion_list[i]))) {
+                        excluded = 1;
+                        break;
+                }
+        }
+        return excluded;
+}
+
 unsigned long kmem_cache_flags(unsigned long object_size,
 	unsigned long flags, const char *name,
 	void (*ctor)(void *))
@@ -1273,8 +1298,12 @@ unsigned long kmem_cache_flags(unsigned long object_size,
 	 * Enable debugging if selected on the kernel commandline.
 	 */
 	if (slub_debug && (!slub_debug_slabs || (name &&
-		!strncmp(slub_debug_slabs, name, strlen(slub_debug_slabs)))))
+		!strncmp(slub_debug_slabs, name, strlen(slub_debug_slabs))))) {
 		flags |= slub_debug;
+
+		if (name && is_kmem_cache_excluded(name))
+			flags &= ~SLAB_STORE_USER;
+	}
 
 	return flags;
 }
@@ -1426,7 +1455,6 @@ static inline struct page *alloc_slab_page(struct kmem_cache *s,
 
 	return page;
 }
-
 #ifdef CONFIG_SLAB_FREELIST_RANDOM
 /* Pre-initialize the random sequence cache */
 static int init_cache_random_seq(struct kmem_cache *s)
@@ -1571,7 +1599,6 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 			goto out;
 		stat(s, ORDER_FALLBACK);
 	}
-
 	if (kmemcheck_enabled &&
 	    !(s->flags & (SLAB_NOTRACK | DEBUG_DEFAULT_FLAGS))) {
 		int pages = 1 << oo_order(oo);
@@ -1675,6 +1702,7 @@ static void __free_slab(struct kmem_cache *s, struct page *page)
 	page_mapcount_reset(page);
 	if (current->reclaim_state)
 		current->reclaim_state->reclaimed_slab += pages;
+
 	memcg_uncharge_slab(page, order, s);
 	kasan_alloc_pages(page, order);
 	__free_pages(page, order);

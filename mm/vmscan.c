@@ -1831,6 +1831,8 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 	int safe = 0;
 	struct pglist_data *pgdat = lruvec_pgdat(lruvec);
 	struct zone_reclaim_stat *reclaim_stat = &lruvec->reclaim_stat;
+	bool force_reclaim = false;
+	enum ttu_flags ttu = TTU_UNMAP;
 
 	if (!inactive_reclaimable_pages(lruvec, sc, lru))
 		return 0;
@@ -1869,10 +1871,15 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 	if (nr_taken == 0)
 		return 0;
 
-	nr_reclaimed = shrink_page_list(&page_list, pgdat, sc, TTU_UNMAP,
+	if (need_memory_boosting(pgdat)) {
+		force_reclaim = true;
+		ttu |= TTU_IGNORE_ACCESS;
+	}
+
+	nr_reclaimed = shrink_page_list(&page_list, pgdat, sc, ttu,
 				&nr_dirty, &nr_unqueued_dirty, &nr_congested,
 				&nr_writeback, &nr_immediate,
-				false);
+				force_reclaim);
 
 	spin_lock_irq(&pgdat->lru_lock);
 
@@ -2193,6 +2200,133 @@ enum scan_balance {
 	SCAN_FILE,
 };
 
+/* mem_boost throttles only kswapd's behavior */
+enum mem_boost {
+	NO_BOOST,
+	BOOST_MID = 1,
+	BOOST_HIGH = 2,
+};
+static int mem_boost_mode = NO_BOOST;
+static unsigned long last_mode_change;
+static bool memory_boosting_disabled = false;
+
+#define MEM_BOOST_MAX_TIME (5 * HZ) /* 5 sec */
+
+#ifdef CONFIG_SYSFS
+static ssize_t mem_boost_mode_show(struct kobject *kobj,
+				    struct kobj_attribute *attr, char *buf)
+{
+	if (time_after(jiffies, last_mode_change + MEM_BOOST_MAX_TIME))
+		mem_boost_mode = NO_BOOST;
+	return sprintf(buf, "%d\n", mem_boost_mode);
+}
+
+static ssize_t mem_boost_mode_store(struct kobject *kobj,
+				     struct kobj_attribute *attr,
+				     const char *buf, size_t count)
+{
+	int mode;
+	int err;
+
+	err = kstrtoint(buf, 10, &mode);
+	if (err || mode > BOOST_HIGH || mode < NO_BOOST)
+		return -EINVAL;
+
+	mem_boost_mode = mode;
+	last_mode_change = jiffies;
+
+	return count;
+}
+
+static ssize_t disable_mem_boost_show(struct kobject *kobj,
+				    struct kobj_attribute *attr, char *buf)
+{
+	int ret;
+
+	ret = memory_boosting_disabled ? 1 : 0;
+	return sprintf(buf, "%d\n", ret);
+}
+
+static ssize_t disable_mem_boost_store(struct kobject *kobj,
+				     struct kobj_attribute *attr,
+				     const char *buf, size_t count)
+{
+	int mode;
+	int err;
+
+	err = kstrtoint(buf, 10, &mode);
+	if (err || (mode != 0 && mode != 1))
+		return -EINVAL;
+
+	memory_boosting_disabled = mode ? true : false;
+
+	return count;
+}
+
+#define MEM_BOOST_ATTR(_name) \
+	static struct kobj_attribute _name##_attr = \
+		__ATTR(_name, 0644, _name##_show, _name##_store)
+MEM_BOOST_ATTR(mem_boost_mode);
+MEM_BOOST_ATTR(disable_mem_boost);
+
+static struct attribute *mem_boost_attrs[] = {
+	&mem_boost_mode_attr.attr,
+	&disable_mem_boost_attr.attr,
+	NULL,
+};
+
+static struct attribute_group mem_boost_attr_group = {
+	.attrs = mem_boost_attrs,
+	.name = "vmscan",
+};
+#endif
+
+static inline bool mem_boost_pgdat_wmark(struct pglist_data *pgdat)
+{
+	int z;
+	struct zone *zone;
+	unsigned long mark;
+
+	for (z = 0; z < MAX_NR_ZONES; z++) {
+		zone = &pgdat->node_zones[z];
+		if (!managed_zone(zone))
+			continue;
+		mark = low_wmark_pages(zone); //TODO: low, high, or (low + high)/2
+		if (zone_watermark_ok_safe(zone, 0, mark, 0))
+			return true;
+	}
+	return false;
+}
+
+#define MEM_BOOST_THRESHOLD ((300 * 1024 * 1024) / (PAGE_SIZE))
+inline bool need_memory_boosting(struct pglist_data *pgdat)
+{
+	bool ret;
+	unsigned long pgdatfile = node_page_state(pgdat, NR_ACTIVE_FILE) +
+				node_page_state(pgdat, NR_INACTIVE_FILE);
+
+	if (time_after(jiffies, last_mode_change + MEM_BOOST_MAX_TIME) ||
+			pgdatfile < MEM_BOOST_THRESHOLD)
+		mem_boost_mode = NO_BOOST;
+
+	if (memory_boosting_disabled)
+		return false;
+
+	switch (mem_boost_mode) {
+	case BOOST_HIGH:
+		ret = true;
+		break;
+	case BOOST_MID:
+		ret = mem_boost_pgdat_wmark(pgdat) ? false : true;
+		break;
+	case NO_BOOST:
+	default:
+		ret = false;
+		break;
+	}
+	return ret;
+}
+
 /*
  * Determine how aggressively the anon and file LRU lists should be
  * scanned.  The relative value of each set of LRU lists is determined
@@ -2276,6 +2410,11 @@ static void get_scan_count(struct lruvec *lruvec, struct mem_cgroup *memcg,
 			scan_balance = SCAN_ANON;
 			goto out;
 		}
+	}
+
+	if (current_is_kswapd() && need_memory_boosting(pgdat)) {
+		scan_balance = SCAN_FILE;
+		goto out;
 	}
 
 	/*
@@ -2501,6 +2640,9 @@ static void shrink_node_memcg(struct pglist_data *pgdat, struct mem_cgroup *memc
 	}
 	blk_finish_plug(&plug);
 	sc->nr_reclaimed += nr_reclaimed;
+
+	if (need_memory_boosting(NULL))
+		return;
 
 	/*
 	 * Even if we did not try to evict anon pages at all, we want to
@@ -3037,7 +3179,11 @@ unsigned long try_to_free_pages(struct zonelist *zonelist, int order,
 		.priority = DEF_PRIORITY,
 		.may_writepage = !laptop_mode,
 		.may_unmap = 1,
+#ifdef CONFIG_DIRECT_RECLAIM_FILE_PAGES_ONLY
+		.may_swap = 0,
+#else
 		.may_swap = 1,
+#endif
 	};
 
 	/*
@@ -3754,6 +3900,10 @@ static int __init kswapd_init(void)
 	for_each_node_state(nid, N_MEMORY)
  		kswapd_run(nid);
 	hotcpu_notifier(cpu_callback, 0);
+#ifdef CONFIG_SYSFS
+	if (sysfs_create_group(mm_kobj, &mem_boost_attr_group))
+		pr_err("vmscan: register mem boost sysfs failed\n");
+#endif
 	return 0;
 }
 

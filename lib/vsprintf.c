@@ -1344,7 +1344,7 @@ char *uuid_string(char *buf, char *end, const u8 *addr,
 	return string(buf, end, uuid, spec);
 }
 
-int kptr_restrict __read_mostly;
+int kptr_restrict __read_mostly = 4;
 
 static noinline_for_stack
 char *restricted_pointer(char *buf, char *end, const void *ptr,
@@ -1602,6 +1602,7 @@ static char *ptr_to_id(char *buf, char *end, void *ptr, struct printf_spec spec)
 
 	return number(buf, end, hashval, spec);
 }
+
 
 /*
  * Show a '%p' thing.  A kernel extension is that the '%p' is followed
