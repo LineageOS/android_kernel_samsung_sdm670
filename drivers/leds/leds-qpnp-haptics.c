@@ -311,6 +311,8 @@ struct hap_chip {
 	struct regmap			*regmap;
 	struct pmic_revid_data		*revid;
 	struct led_classdev		cdev;
+	struct class			*to_class;
+	struct device			*to_dev;
 	spinlock_t			bus_lock;
 	struct mutex			play_lock;
 	struct mutex			param_lock;
@@ -721,6 +723,8 @@ static int qpnp_haptics_play(struct hap_chip *chip, bool enable)
 {
 	int rc = 0, time_ms = chip->play_time_ms;
 
+	pr_info("[VIB] %s: %s\n", __func__, enable ? "ON" : "OFF");
+
 	if (chip->perm_disable && enable)
 		return 0;
 
@@ -755,6 +759,7 @@ static int qpnp_haptics_play(struct hap_chip *chip, bool enable)
 
 		if (chip->play_mode == HAP_BUFFER)
 			time_ms = get_buffer_mode_duration(chip);
+
 		hrtimer_start(&chip->stop_timer,
 			ktime_set(time_ms / MSEC_PER_SEC,
 			(time_ms % MSEC_PER_SEC) * NSEC_PER_MSEC),
@@ -774,6 +779,12 @@ static int qpnp_haptics_play(struct hap_chip *chip, bool enable)
 		rc = qpnp_haptics_play_control(chip, HAP_STOP);
 		if (rc < 0) {
 			pr_err("Error in disabling play, rc=%d\n", rc);
+			goto out;
+		}
+
+		rc = qpnp_haptics_mod_enable(chip, false);
+		if (rc < 0) {
+			pr_err("Error in enabling module, rc=%d\n", rc);
 			goto out;
 		}
 
@@ -1817,6 +1828,61 @@ static struct device_attribute qpnp_haptics_attrs[] = {
 		qpnp_haptics_store_lra_auto_mode),
 };
 
+static void vibrator_enable(struct hap_chip *chip, int value)
+{
+	hrtimer_cancel(&chip->stop_timer);
+
+	if (value == 0) {
+		pr_info("[VIB]: OFF\n");
+		atomic_set(&chip->state, 0);
+		chip->play_time_ms = 0;
+	} else {
+		atomic_set(&chip->state, 1);
+		chip->play_time_ms = value;
+		pr_info("[VIB]: ON, Duration : %d msec\n", chip->play_time_ms);
+	}
+
+	schedule_work(&chip->haptics_work);
+}
+
+
+static ssize_t enable_show(struct device *dev, struct device_attribute *attr,
+		char *buf)
+{
+	struct hap_chip *chip = dev_get_drvdata(dev);
+	struct hrtimer *timer = &chip->stop_timer;
+	int remaining = 0;
+
+	if (hrtimer_active(timer)) {
+		ktime_t remain = hrtimer_get_remaining(timer);
+		struct timeval t = ktime_to_timeval(remain);
+
+		remaining = t.tv_sec * 1000 + t.tv_usec / 1000;
+	}
+	return sprintf(buf, "%d\n", remaining);
+
+	return 0;
+}
+
+static ssize_t enable_store(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t size)
+{
+
+	struct hap_chip *chip = dev_get_drvdata(dev);
+	int value;
+	int ret;
+
+	ret = kstrtoint(buf, 0, &value);
+	if (ret != 0)
+		return -EINVAL;
+
+	vibrator_enable(chip, value);
+
+	return size;
+}
+
+static DEVICE_ATTR(enable, 0660, enable_show, enable_store);
+
 /* Dummy functions for brightness */
 static
 enum led_brightness qpnp_haptics_brightness_get(struct led_classdev *cdev)
@@ -2422,6 +2488,8 @@ static int qpnp_haptics_probe(struct platform_device *pdev)
 	struct hap_chip *chip;
 	int rc, i;
 
+	pr_info("%s start\n", __func__);
+
 	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
 	if (!chip)
 		return -ENOMEM;
@@ -2479,6 +2547,20 @@ static int qpnp_haptics_probe(struct platform_device *pdev)
 			goto sysfs_fail;
 		}
 	}
+
+	chip->to_class = class_create(THIS_MODULE, "timed_output");
+	if (IS_ERR(chip->to_class)) {
+		pr_err("[VIB]: timed_output classs create fail (rc=%d)\n", rc);
+	}
+	chip->to_dev = device_create(chip->to_class, NULL, 0, chip, "vibrator");
+	if (IS_ERR(chip->to_dev))
+		return PTR_ERR(chip->to_dev);
+
+	rc = sysfs_create_file(&chip->to_dev->kobj, &dev_attr_enable.attr);
+	if (rc < 0)
+		pr_err("[VIB]: Failed to register sysfs enable: %d\n", rc);
+
+	pr_info("%s finish\n", __func__);
 
 	return 0;
 
