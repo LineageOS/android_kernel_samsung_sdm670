@@ -163,8 +163,14 @@ static int qti_ice_setting_config(struct request *req,
 				setting->encr_bypass = false;
 			break;
 		case READ:
-			if (!ice_fde_flag || (ice_fde_flag & QCOM_ICE_DECRYPT))
-				setting->decr_bypass = false;
+			if (!ice_fde_flag || (ice_fde_flag & QCOM_ICE_DECRYPT)) {
+				if (unlikely(req->cmd_flags & REQ_BYPASS)) {
+					setting->encr_bypass = true;
+					setting->decr_bypass = true;
+				} else {
+					setting->decr_bypass = false;
+				}
+			}
 			break;
 		default:
 			/* Should I say BUG_ON */
