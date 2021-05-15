@@ -147,8 +147,15 @@ static ssize_t read_ahead_kb_store(struct device *dev,
 	struct backing_dev_info *bdi = dev_get_drvdata(dev);
 	unsigned long read_ahead_kb;
 	ssize_t ret;
+	static const char temp[] = "temporary ";
+
+	if (strncmp(buf, temp, sizeof(temp) - 1) != 0)
+		return count;
+
+	buf += sizeof(temp) - 1;
 
 	ret = kstrtoul(buf, 10, &read_ahead_kb);
+
 	if (ret < 0)
 		return ret;
 
@@ -834,6 +841,10 @@ int bdi_init(struct backing_dev_info *bdi)
 	INIT_LIST_HEAD(&bdi->bdi_list);
 	INIT_LIST_HEAD(&bdi->wb_list);
 	init_waitqueue_head(&bdi->wb_waitq);
+
+	bdi->last_thresh = 0;
+	bdi->last_nr_dirty = 0;
+	bdi->paused_total = 0;
 
 	ret = cgwb_bdi_init(bdi);
 

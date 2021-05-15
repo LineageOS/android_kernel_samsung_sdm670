@@ -15,6 +15,8 @@
 #include <linux/integrity.h>
 #include <crypto/sha.h>
 #include <linux/key.h>
+#include <crypto/hash_info.h>
+
 
 /* iint action cache flags */
 #define IMA_MEASURE		0x00000001
@@ -143,6 +145,8 @@ int integrity_digsig_verify(const unsigned int id, const char *sig, int siglen,
 
 int __init integrity_init_keyring(const unsigned int id);
 int __init integrity_load_x509(const unsigned int id, const char *path);
+int __init integrity_load_x509_from_mem(const unsigned int id,
+					const char *data, size_t size);
 #else
 
 static inline int integrity_digsig_verify(const unsigned int id,
