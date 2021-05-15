@@ -271,6 +271,7 @@ static int __init rmem_cma_setup(struct reserved_mem *rmem)
 
 	rmem->ops = &rmem_cma_ops;
 	rmem->priv = cma;
+	rmem->reusable = true;
 
 	pr_info("Reserved memory: created CMA memory pool at %pa, size %ld MiB\n",
 		&rmem->base, (unsigned long)rmem->size / SZ_1M);

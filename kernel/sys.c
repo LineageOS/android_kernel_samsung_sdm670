@@ -66,6 +66,10 @@
 #include <asm/io.h>
 #include <asm/unistd.h>
 
+#ifdef CONFIG_LOD_SEC
+#include <linux/linux_on_dex.h>
+#endif
+
 #ifndef SET_UNALIGN_CTL
 # define SET_UNALIGN_CTL(a, b)	(-EINVAL)
 #endif
@@ -342,6 +346,16 @@ SYSCALL_DEFINE2(setregid, gid_t, rgid, gid_t, egid)
 	krgid = make_kgid(ns, rgid);
 	kegid = make_kgid(ns, egid);
 
+#ifdef CONFIG_LOD_SEC
+	if (current_is_LOD()) {
+		if (!gid_is_LOD(krgid.val))
+			return -EACCES;
+
+		if (!gid_is_LOD(kegid.val))
+			return -EACCES;
+	}
+#endif
+
 	if ((rgid != (gid_t) -1) && !gid_valid(krgid))
 		return -EINVAL;
 	if ((egid != (gid_t) -1) && !gid_valid(kegid))
@@ -397,6 +411,14 @@ SYSCALL_DEFINE1(setgid, gid_t, gid)
 	kgid_t kgid;
 
 	kgid = make_kgid(ns, gid);
+
+#ifdef CONFIG_LOD_SEC
+	if (current_is_LOD()) {
+		if (!gid_is_LOD(kgid.val))
+			return -EACCES;
+	}
+#endif
+
 	if (!gid_valid(kgid))
 		return -EINVAL;
 
@@ -475,6 +497,16 @@ SYSCALL_DEFINE2(setreuid, uid_t, ruid, uid_t, euid)
 	kruid = make_kuid(ns, ruid);
 	keuid = make_kuid(ns, euid);
 
+#ifdef CONFIG_LOD_SEC
+	if (current_is_LOD()) {
+		if (!uid_is_LOD(kruid.val))
+			return -EACCES;
+
+		if (!uid_is_LOD(keuid.val))
+			return -EACCES;
+	}
+#endif
+
 	if ((ruid != (uid_t) -1) && !uid_valid(kruid))
 		return -EINVAL;
 	if ((euid != (uid_t) -1) && !uid_valid(keuid))
@@ -544,6 +576,14 @@ SYSCALL_DEFINE1(setuid, uid_t, uid)
 	kuid_t kuid;
 
 	kuid = make_kuid(ns, uid);
+
+#ifdef CONFIG_LOD_SEC
+	if (current_is_LOD()) {
+		if (!uid_is_LOD(kuid.val))
+			return -EACCES;
+	}
+#endif
+
 	if (!uid_valid(kuid))
 		return -EINVAL;
 
@@ -593,6 +633,19 @@ SYSCALL_DEFINE3(setresuid, uid_t, ruid, uid_t, euid, uid_t, suid)
 	kruid = make_kuid(ns, ruid);
 	keuid = make_kuid(ns, euid);
 	ksuid = make_kuid(ns, suid);
+
+#ifdef CONFIG_LOD_SEC
+	if (current_is_LOD()) {
+		if (!uid_is_LOD(kruid.val))
+			return -EACCES;
+
+		if (!uid_is_LOD(keuid.val))
+			return -EACCES;
+
+		if (!uid_is_LOD(ksuid.val))
+			return -EACCES;
+	}
+#endif
 
 	if ((ruid != (uid_t) -1) && !uid_valid(kruid))
 		return -EINVAL;
@@ -681,6 +734,19 @@ SYSCALL_DEFINE3(setresgid, gid_t, rgid, gid_t, egid, gid_t, sgid)
 	kegid = make_kgid(ns, egid);
 	ksgid = make_kgid(ns, sgid);
 
+#ifdef CONFIG_LOD_SEC
+	if (current_is_LOD()) {
+		if (!gid_is_LOD(krgid.val))
+			return -EACCES;
+
+		if (!gid_is_LOD(kegid.val))
+			return -EACCES;
+
+		if (!gid_is_LOD(ksgid.val))
+			return -EACCES;
+	}
+#endif
+
 	if ((rgid != (gid_t) -1) && !gid_valid(krgid))
 		return -EINVAL;
 	if ((egid != (gid_t) -1) && !gid_valid(kegid))
@@ -759,6 +825,14 @@ SYSCALL_DEFINE1(setfsuid, uid_t, uid)
 	old_fsuid = from_kuid_munged(old->user_ns, old->fsuid);
 
 	kuid = make_kuid(old->user_ns, uid);
+
+#ifdef CONFIG_LOD_SEC
+	if (current_is_LOD()) {
+		if (!uid_is_LOD(kuid.val))
+			return -EACCES;
+	}
+#endif
+
 	if (!uid_valid(kuid))
 		return old_fsuid;
 
@@ -798,6 +872,14 @@ SYSCALL_DEFINE1(setfsgid, gid_t, gid)
 	old_fsgid = from_kgid_munged(old->user_ns, old->fsgid);
 
 	kgid = make_kgid(old->user_ns, gid);
+
+#ifdef CONFIG_LOD_SEC
+	if (current_is_LOD()) {
+		if (!gid_is_LOD(kgid.val))
+			return -EACCES;
+	}
+#endif
+
 	if (!gid_valid(kgid))
 		return old_fsgid;
 
