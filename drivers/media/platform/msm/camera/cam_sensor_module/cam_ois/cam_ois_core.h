@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -12,11 +12,7 @@
 #ifndef _CAM_OIS_CORE_H_
 #define _CAM_OIS_CORE_H_
 
-#include <linux/cma.h>
-#include <linux/dma-contiguous.h>
 #include "cam_ois_dev.h"
-
-#define OIS_NAME_LEN 32
 
 /**
  * @power_info: power setting info to control the power
@@ -30,6 +26,10 @@ int32_t cam_ois_construct_default_power_setting(
 
 
 int cam_ois_driver_cmd(struct cam_ois_ctrl_t *e_ctrl, void *arg);
+int cam_ois_power_up(struct cam_ois_ctrl_t *o_ctrl);
+int cam_ois_power_down(struct cam_ois_ctrl_t *o_ctrl);
+int cam_ois_apply_settings(struct cam_ois_ctrl_t *o_ctrl,
+	struct i2c_settings_array *i2c_set);
 
 /**
  * @o_ctrl: OIS ctrl structure
@@ -37,6 +37,5 @@ int cam_ois_driver_cmd(struct cam_ois_ctrl_t *e_ctrl, void *arg);
  * This API handles the shutdown ioctl/close
  */
 void cam_ois_shutdown(struct cam_ois_ctrl_t *o_ctrl);
-
 #endif
 /* _CAM_OIS_CORE_H_ */
