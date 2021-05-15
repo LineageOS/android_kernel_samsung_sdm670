@@ -650,6 +650,7 @@ static void rmnet_map_fill_ipv6_packet_ul_checksum_header
 		ul_header->udp_ind = 1;
 	else
 		ul_header->udp_ind = 0;
+
 	/* Changing checksum_insert_offset to network order */
 	hdr++;
 	*hdr = htons(*hdr);

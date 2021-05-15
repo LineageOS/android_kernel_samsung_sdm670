@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -181,6 +181,12 @@ struct dp_parser {
 	bool yuv_support;
 
 	const char *display_type;
+#ifdef CONFIG_SEC_DISPLAYPORT
+	u32 rev_hw;
+	bool aux_sw;		/* true if AUX switch IC is located */
+	bool aux_redrv;		/* true if Redriver IC is located */
+	bool prefer_res;	/* true if prefer resolution has high priority */
+#endif
 
 	int (*parse)(struct dp_parser *parser);
 	struct dp_io_data *(*get_io)(struct dp_parser *parser, char *name);
