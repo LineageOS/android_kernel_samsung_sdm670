@@ -47,6 +47,7 @@ enum {
 	POWER_SUPPLY_CHARGE_TYPE_TRICKLE,
 	POWER_SUPPLY_CHARGE_TYPE_FAST,
 	POWER_SUPPLY_CHARGE_TYPE_TAPER,
+	POWER_SUPPLY_CHARGE_TYPE_SLOW,
 };
 
 enum {
@@ -62,6 +63,9 @@ enum {
 	POWER_SUPPLY_HEALTH_WARM,
 	POWER_SUPPLY_HEALTH_COOL,
 	POWER_SUPPLY_HEALTH_HOT,
+	POWER_SUPPLY_HEALTH_UNDERVOLTAGE,
+	POWER_SUPPLY_HEALTH_OVERHEATLIMIT,
+	POWER_SUPPLY_HEALTH_MAX,
 };
 
 enum {
@@ -314,29 +318,37 @@ enum power_supply_property {
 	POWER_SUPPLY_PROP_SERIAL_NUMBER,
 	POWER_SUPPLY_PROP_BATTERY_TYPE,
 	POWER_SUPPLY_PROP_CYCLE_COUNTS,
+	POWER_SUPPLY_PROP_MAX,
+	POWER_SUPPLY_EXT_PROP_MAX = POWER_SUPPLY_PROP_MAX + 256,
 };
 
 enum power_supply_type {
 	POWER_SUPPLY_TYPE_UNKNOWN = 0,
-	POWER_SUPPLY_TYPE_BATTERY,
-	POWER_SUPPLY_TYPE_UPS,
-	POWER_SUPPLY_TYPE_MAINS,
-	POWER_SUPPLY_TYPE_USB,		/* Standard Downstream Port */
-	POWER_SUPPLY_TYPE_USB_DCP,	/* Dedicated Charging Port */
-	POWER_SUPPLY_TYPE_USB_CDP,	/* Charging Downstream Port */
-	POWER_SUPPLY_TYPE_USB_ACA,	/* Accessory Charger Adapters */
-	POWER_SUPPLY_TYPE_USB_HVDCP,	/* High Voltage DCP */
-	POWER_SUPPLY_TYPE_USB_HVDCP_3,	/* Efficient High Voltage DCP */
-	POWER_SUPPLY_TYPE_USB_PD,       /* Power Delivery */
-	POWER_SUPPLY_TYPE_WIRELESS,	/* Accessory Charger Adapters */
-	POWER_SUPPLY_TYPE_USB_FLOAT,	/* Floating charger */
-	POWER_SUPPLY_TYPE_BMS,		/* Battery Monitor System */
-	POWER_SUPPLY_TYPE_PARALLEL,	/* Parallel Path */
-	POWER_SUPPLY_TYPE_MAIN,		/* Main Path */
-	POWER_SUPPLY_TYPE_WIPOWER,	/* Wipower */
-	POWER_SUPPLY_TYPE_TYPEC,	/* Type-C */
-	POWER_SUPPLY_TYPE_UFP,		/* Type-C UFP */
-	POWER_SUPPLY_TYPE_DFP,		/* TYpe-C DFP */
+	POWER_SUPPLY_TYPE_BATTERY,	/* 1 */
+	POWER_SUPPLY_TYPE_UPS,		/* 2 */
+	POWER_SUPPLY_TYPE_MAINS,	/* 3 */
+	POWER_SUPPLY_TYPE_USB,		/* Standard Downstream Port (4) */
+	POWER_SUPPLY_TYPE_USB_DCP,	/* Dedicated Charging Port (5) */
+	POWER_SUPPLY_TYPE_USB_CDP,	/* Charging Downstream Port (6) */
+	POWER_SUPPLY_TYPE_USB_ACA,	/* Accessory Charger Adapters (7) */
+	POWER_SUPPLY_TYPE_USB_HVDCP,	/* Efficient High Voltage DCP (8) */
+	POWER_SUPPLY_TYPE_USB_HVDCP_3,	/* Efficient High Voltage DCP 3 (9) */
+	POWER_SUPPLY_TYPE_USB_PD,	/* Power Delivery (10) */
+	POWER_SUPPLY_TYPE_WIRELESS,	/* Wireless (11) */
+	POWER_SUPPLY_TYPE_USB_FLOAT,	/* Floating charger (12) */
+	POWER_SUPPLY_TYPE_BMS,		/* Battery Monitor System (13) */
+	POWER_SUPPLY_TYPE_PARALLEL,	/* Parallel (14) */
+	POWER_SUPPLY_TYPE_MAIN,		/* Main (15) */
+	POWER_SUPPLY_TYPE_WIPOWER,	/* Wipower (16) */
+	POWER_SUPPLY_TYPE_TYPEC,	/* Type-C (17) */
+	POWER_SUPPLY_TYPE_UFP,		/* Type-C UFP (18) */
+	POWER_SUPPLY_TYPE_DFP,		/* TYpe-C DFP (19) */
+	POWER_SUPPLY_TYPE_POWER_SHARING,/* power sharing cable(20) */
+	POWER_SUPPLY_TYPE_OTG,		/* OTG (21) */
+#if defined(CONFIG_USE_POGO)
+	POWER_SUPPLY_TYPE_POGO,			/* POGO (22)*/
+#endif
+	POWER_SUPPLY_TYPE_MAX,
 };
 
 /* Indicates USB Type-C CC connection status */
@@ -366,6 +378,12 @@ enum power_supply_typec_power_role {
 
 enum power_supply_notifier_events {
 	PSY_EVENT_PROP_CHANGED,
+};
+
+enum vmbms_power_usecase {
+	VMBMS_IGNORE_ALL_BIT = 1,
+	VMBMS_VOICE_CALL_BIT = (1 << 4),
+	VMBMS_STATIC_DISPLAY_BIT = (1 << 5),
 };
 
 union power_supply_propval {
@@ -511,7 +529,7 @@ extern int power_supply_set_battery_charged(struct power_supply *psy);
 #ifdef CONFIG_POWER_SUPPLY
 extern int power_supply_is_system_supplied(void);
 #else
-static inline int power_supply_is_system_supplied(void) { return -EIO; }
+static inline int power_supply_is_system_supplied(void) { return -ENOSYS; }
 #endif
 
 extern int power_supply_get_property(struct power_supply *psy,
