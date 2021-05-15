@@ -74,6 +74,9 @@ static enum hrtimer_restart gpio_event_input_timer_func(struct hrtimer *timer)
 	key_entry = ds->info->keymap;
 	key_state = ds->key_state;
 	sync_needed = false;
+
+	pr_info("gpio_event_input_timer_func : enter\n");
+
 	spin_lock_irqsave(&ds->irq_lock, irqflags);
 	for (i = 0; i < nkeys; i++, key_entry++, key_state++) {
 		debounce = key_state->debounce;
@@ -130,6 +133,7 @@ static enum hrtimer_restart gpio_event_input_timer_func(struct hrtimer *timer)
 			pr_info("gpio_keys_scan_keys: key %x-%x, %d (%d) "
 				"changed to %d\n", ds->info->type,
 				key_entry->code, i, key_entry->gpio, pressed);
+		pr_info("gpio_event_input_timer_func : input_event : code = %d pressed = %d\n", key_entry->code, pressed);
 		input_event(ds->input_devs->dev[key_entry->dev], ds->info->type,
 			    key_entry->code, pressed);
 		sync_needed = true;
@@ -156,6 +160,8 @@ static enum hrtimer_restart gpio_event_input_timer_func(struct hrtimer *timer)
 		__pm_relax(ds->ws);
 
 	spin_unlock_irqrestore(&ds->irq_lock, irqflags);
+
+	pr_info("gpio_event_input_timer_func : exit\n");
 
 	return HRTIMER_NORESTART;
 }
@@ -264,6 +270,8 @@ int gpio_event_input_func(struct gpio_event_input_devs *input_devs,
 	struct gpio_input_state *ds = *data;
 	char *wlname;
 
+	pr_info("gpio_event_input_func : enter\n");
+
 	di = container_of(info, struct gpio_event_input_info, info);
 
 	if (func == GPIO_EVENT_FUNC_SUSPEND) {
@@ -363,17 +371,23 @@ int gpio_event_input_func(struct gpio_event_input_devs *input_devs,
 	}
 
 	ret = 0;
-	spin_lock_irqsave(&ds->irq_lock, irqflags);
+
+	pr_info("gpio_event_input_func : hrtimer_cancel\n");
+
+	if (ds->use_irq)
+		for (i = 0; i < di->keymap_size; i++)
+			disable_irq(gpio_to_irq(di->keymap[i].gpio));
 	hrtimer_cancel(&ds->timer);
 	if (ds->use_irq) {
 		for (i = di->keymap_size - 1; i >= 0; i--) {
 			int irq = gpio_to_irq(di->keymap[i].gpio);
-			if (ds->info->info.no_suspend)
+			if (ds->info->info.no_suspend)	{
+				pr_info("gpio_event_input_func : disable_irq_wake\n");
 				disable_irq_wake(irq);
+			}
 			free_irq(irq, &ds->key_state[i]);
 		}
 	}
-	spin_unlock_irqrestore(&ds->irq_lock, irqflags);
 
 	for (i = di->keymap_size - 1; i >= 0; i--) {
 err_gpio_configure_failed:
@@ -386,5 +400,8 @@ err_bad_keymap:
 err_ws_failed:
 	kfree(ds);
 err_ds_alloc_failed:
+
+	pr_info("gpio_event_input_func : exit\n");
+
 	return ret;
 }
