@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -54,16 +54,12 @@ int crm_timer_init(struct cam_req_mgr_timer **timer,
 	CAM_DBG(CAM_CRM, "init timer %d %pK", expires, *timer);
 	if (*timer == NULL) {
 		if (g_cam_req_mgr_timer_cachep) {
-			crm_timer = (struct cam_req_mgr_timer *)
-				kmem_cache_alloc(
-					g_cam_req_mgr_timer_cachep,
-					__GFP_ZERO | GFP_KERNEL);
+			crm_timer = (struct cam_req_mgr_timer *)kmem_cache_alloc(g_cam_req_mgr_timer_cachep, __GFP_ZERO | GFP_KERNEL);
 			if (!crm_timer) {
 				ret = -ENOMEM;
 				goto end;
 			}
 		}
-
 		else {
 			ret = -ENOMEM;
 			goto end;
@@ -92,8 +88,7 @@ void crm_timer_exit(struct cam_req_mgr_timer **crm_timer)
 	CAM_DBG(CAM_CRM, "destroy timer %pK @ %pK", *crm_timer, crm_timer);
 	if (*crm_timer) {
 		del_timer_sync(&(*crm_timer)->sys_timer);
-		if (g_cam_req_mgr_timer_cachep)
-			kmem_cache_free(g_cam_req_mgr_timer_cachep, *crm_timer);
+		kmem_cache_free(g_cam_req_mgr_timer_cachep, *crm_timer);
 		*crm_timer = NULL;
 	}
 }

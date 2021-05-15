@@ -10,7 +10,6 @@
 
 #include <linux/list.h>
 #include "mount.h"
-
 #define IS_MNT_SHARED(m) ((m)->mnt.mnt_flags & MNT_SHARED)
 #define IS_MNT_SLAVE(m) ((m)->mnt_master)
 #define IS_MNT_NEW(m)  (!(m)->mnt_ns)
@@ -31,7 +30,6 @@
 #define CL_COPY_MNT_NS_FILE	0x80
 
 #define CL_COPY_ALL		(CL_COPY_UNBINDABLE | CL_COPY_MNT_NS_FILE)
-
 static inline void set_mnt_shared(struct mount *mnt)
 {
 	mnt->mnt.mnt_flags &= ~MNT_SHARED_MASK;
