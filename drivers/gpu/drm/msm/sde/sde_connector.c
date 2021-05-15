@@ -24,6 +24,10 @@
 #include "sde_crtc.h"
 #include "sde_rm.h"
 
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+#include "ss_dsi_panel_common.h"
+#endif
+
 #define BL_NODE_NAME_SIZE 32
 
 /* Autorefresh will occur after FRAME_CNT frames. Large values are unlikely */
@@ -143,7 +147,11 @@ static int sde_backlight_setup(struct sde_connector *c_conn,
 	display = (struct dsi_display *) c_conn->display;
 	bl_config = &display->panel->bl_config;
 	props.max_brightness = bl_config->brightness_max_level;
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+	props.brightness = bl_config->bl_level;
+#else
 	props.brightness = bl_config->brightness_max_level;
+#endif
 	snprintf(bl_node_name, BL_NODE_NAME_SIZE, "panel%u-backlight",
 							display_count);
 	c_conn->bl_device = backlight_device_register(bl_node_name, dev->dev,
@@ -432,6 +440,7 @@ void sde_connector_schedule_status_work(struct drm_connector *connector,
 	if (c_conn->ops.check_status &&
 		(info.capabilities & MSM_DISPLAY_ESD_ENABLED)) {
 		if (en) {
+#if !defined(CONFIG_DISPLAY_SAMSUNG)
 			u32 interval;
 
 			/*
@@ -444,6 +453,7 @@ void sde_connector_schedule_status_work(struct drm_connector *connector,
 			/* Schedule ESD status check */
 			schedule_delayed_work(&c_conn->status_work,
 				msecs_to_jiffies(interval));
+#endif
 			c_conn->esd_status_check = true;
 		} else {
 			/* Cancel any pending ESD status check */
@@ -488,7 +498,13 @@ static int _sde_connector_update_power_locked(struct sde_connector *c_conn)
 	SDE_DEBUG("conn %d - dpms %d, lp %d, panel %d\n", connector->base.id,
 			c_conn->dpms_mode, c_conn->lp_mode, mode);
 
+#if !defined(CONFIG_DISPLAY_SAMSUNG) /* QC Original */
 	if (mode != c_conn->last_panel_power_mode && c_conn->ops.set_power) {
+#else /* SS Modify */
+	if (mode != c_conn->last_panel_power_mode && c_conn->ops.set_power
+	&& !(mode == SDE_MODE_DPMS_OFF && c_conn->last_panel_power_mode == SDE_MODE_DPMS_ON)
+	&& !(mode == SDE_MODE_DPMS_ON && c_conn->last_panel_power_mode == SDE_MODE_DPMS_OFF)) {
+#endif
 		display = c_conn->display;
 		set_power = c_conn->ops.set_power;
 
@@ -1894,6 +1910,13 @@ static void _sde_connector_report_panel_dead(struct sde_connector *conn)
 	SDE_EVT32(SDE_EVTLOG_ERROR);
 	SDE_ERROR("esd check failed report PANEL_DEAD conn_id: %d enc_id: %d\n",
 			conn->base.base.id, conn->encoder->base.id);
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+	{
+		struct dsi_display *display = conn->display;
+		struct samsung_display_driver_data *vdd = display->panel->panel_private;
+		vdd->panel_dead = true;
+	}
+#endif
 }
 
 int sde_connector_esd_status(struct drm_connector *conn)
@@ -1910,7 +1933,11 @@ int sde_connector_esd_status(struct drm_connector *conn)
 
 	/* protect this call with ESD status check call */
 	mutex_lock(&sde_conn->lock);
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+	ret = sde_conn->ops.check_status(sde_conn->display, false);
+#else
 	ret = sde_conn->ops.check_status(sde_conn->display, true);
+#endif
 	mutex_unlock(&sde_conn->lock);
 
 	if (ret <= 0) {
@@ -1957,6 +1984,7 @@ static void sde_connector_check_status_work(struct work_struct *work)
 	}
 
 	if (rc > 0) {
+#if !defined(CONFIG_DISPLAY_SAMSUNG)
 		u32 interval;
 
 		SDE_DEBUG("esd check status success conn_id: %d enc_id: %d\n",
@@ -1967,6 +1995,7 @@ static void sde_connector_check_status_work(struct work_struct *work)
 			conn->esd_status_interval : STATUS_CHECK_INTERVAL_MS;
 		schedule_delayed_work(&conn->status_work,
 			msecs_to_jiffies(interval));
+#endif
 		return;
 	}
 
