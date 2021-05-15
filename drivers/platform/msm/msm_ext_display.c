@@ -22,6 +22,17 @@
 #include <linux/of_platform.h>
 #include <linux/msm_ext_display.h>
 
+#ifdef CONFIG_SEC_DISPLAYPORT
+#include <linux/switch.h>
+#include <linux/secdp_logger.h>
+
+#ifdef CONFIG_SWITCH
+static struct switch_dev switch_secdp = {
+	.name = "ch_hdmi_audio",
+};
+#endif
+#endif
+
 struct msm_ext_disp_list {
 	struct msm_ext_disp_init_data *data;
 	struct list_head list;
@@ -154,6 +165,10 @@ end:
 	return ret;
 }
 
+#ifdef CONFIG_SEC_DISPLAYPORT
+extern int secdp_get_audio_ch(void);
+#endif
+
 static int msm_ext_disp_process_audio(struct msm_ext_disp *ext_disp,
 		enum msm_ext_disp_type type,
 		enum msm_ext_disp_cable_state new_state)
@@ -190,6 +205,16 @@ static int msm_ext_disp_process_audio(struct msm_ext_disp *ext_disp,
 			ext_disp->current_disp, !!new_state);
 		pr_debug("state changed to %d\n", new_state);
 	}
+
+#if defined(CONFIG_SEC_DISPLAYPORT) && defined(CONFIG_SWITCH)
+{
+	int audio_ch = new_state ? secdp_get_audio_ch() : -1;
+
+	switch_set_state(&switch_secdp, audio_ch);
+	pr_info("secdp audio state : 0x%02x(%d)\n", audio_ch, audio_ch);
+}
+#endif
+
 end:
 	return ret;
 }
@@ -225,13 +250,23 @@ static struct msm_ext_disp *msm_ext_disp_validate_and_get(
 	if (state == EXT_DISPLAY_CABLE_CONNECT) {
 		if (ext_disp->current_disp != EXT_DISPLAY_TYPE_MAX &&
 		    ext_disp->current_disp != type) {
+#ifndef CONFIG_SEC_DISPLAYPORT
 			pr_err("invalid interface call\n");
+#else
+			pr_err("invalid interface call(%d), curr_disp(%d), type(%d)\n",
+				state, ext_disp->current_disp, type);
+#endif
 			goto err;
 		}
 	} else {
 		if (ext_disp->current_disp == EXT_DISPLAY_TYPE_MAX ||
 		    ext_disp->current_disp != type) {
+#ifndef CONFIG_SEC_DISPLAYPORT
 			pr_err("invalid interface call\n");
+#else
+			pr_err("invalid interface call(%d), curr_disp(%d), type(%d)\n",
+				state, ext_disp->current_disp, type);
+#endif
 			goto err;
 		}
 	}
@@ -520,6 +555,14 @@ static int msm_ext_disp_probe(struct platform_device *pdev)
 		pr_debug("%s: Added child devices.\n", __func__);
 	}
 
+#if defined(CONFIG_SEC_DISPLAYPORT) && defined(CONFIG_SWITCH)
+	ret = switch_dev_register(&switch_secdp);
+	if (ret) {
+		pr_info("Failed to register secdp switch(%d)\n", ret);
+		goto child_node_failure;
+	}
+#endif
+
 	mutex_init(&ext_disp->lock);
 
 	INIT_LIST_HEAD(&ext_disp->display_list);
@@ -553,6 +596,10 @@ static int msm_ext_disp_remove(struct platform_device *pdev)
 		ret = -ENODEV;
 		goto end;
 	}
+
+#if defined(CONFIG_SEC_DISPLAYPORT) && defined(CONFIG_SWITCH)
+	switch_dev_unregister(&switch_secdp);
+#endif
 
 	ext_disp = container_of(ext_disp_data, struct msm_ext_disp,
 				ext_disp_data);

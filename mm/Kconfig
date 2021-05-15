@@ -533,6 +533,13 @@ config CMA_DEBUGFS
 	help
 	  Turns on the DebugFS interface for CMA.
 
+config CMA_PINPAGE_MIGRATION
+	bool "CMA pinned page migration (EXPERIMENTAL)"
+	depends on CMA
+	default n
+	help
+	  Turns on cma page migration for pinned page.
+
 config CMA_AREAS
 	int "Maximum count of the CMA areas"
 	depends on CMA
@@ -779,3 +786,47 @@ config SPECULATIVE_PAGE_FAULT
 	 detected or because underlying PMD or PTE tables are not yet
 	 allocating, it is failing its processing and a classic page fault
 	 is then tried.
+
+config LARGE_DIRTY_BUFFER
+   bool "Use large dirty_threshold value by enabling dirty_ratio"
+   default n
+   help
+    This config enables dirty_ratio/dirty_background_ratio,
+    and it means large dirty_threshold value in 64bit architectures.
+    If unsure, say N to use kernel default value
+
+config MAX_DIRTY_THRESH_PAGES
+   int "The upper bound of VM dirty_thresh value in number of pages"
+   default 0
+   help
+    This value is the upper bound of VM dirty-thresh. (0 means no limit.)
+    It is only effective when dirty_ratio is used.
+    (Setting dirty_bytes disables this option.)
+
+config INCREASE_MAXIMUM_SWAPPINESS
+	bool "Allow swappiness to be set up to 200"
+	depends on SWAP
+	default y
+
+config DIRECT_RECLAIM_FILE_PAGES_ONLY
+	bool "Reclaim file pages only on direct reclaim path"
+	depends on SWAP
+	default y
+
+config MMAP_READAROUND_LIMIT
+	int "Limit mmap readaround upperbound"
+	default 0
+	help
+	  Inappropriate mmap readaround size can hurt device performance
+	  during the sluggish situation. Add the hard upper-limit for
+	  mmap readaround.
+
+config SWAP_ENABLE_READAHEAD
+	bool "Enable readahead on page swap in"
+	depends on SWAP
+	default n
+	help
+	  When a page fault occurs, adjacent pages of SWAP_CLUSTER_MAX are
+	  also paged in expecting those pages will be used in near future.
+	  This behaviour is good at disk-based system, but not on in-memory
+	  compression (e.g. zram).
