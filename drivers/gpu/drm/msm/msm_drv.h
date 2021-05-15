@@ -797,6 +797,9 @@ struct drm_framebuffer *msm_framebuffer_create(struct drm_device *dev,
 struct drm_fb_helper *msm_fbdev_init(struct drm_device *dev);
 void msm_fbdev_free(struct drm_device *dev);
 
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+int __msm_drm_notifier_call_chain(unsigned long event, void *data);
+#endif
 struct hdmi;
 #ifdef CONFIG_DRM_MSM_HDMI
 int msm_hdmi_modeset_init(struct hdmi *hdmi, struct drm_device *dev,
