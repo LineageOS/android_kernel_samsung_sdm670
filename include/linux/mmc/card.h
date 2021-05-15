@@ -17,6 +17,13 @@
 #include <linux/notifier.h>
 
 #define MMC_CARD_CMDQ_BLK_SIZE 512
+#define MAX_CNT_U64     0xFFFFFFFFFF
+#define MAX_CNT_U32     0x7FFFFFFF
+#define STATUS_MASK     (R1_ERROR | R1_CC_ERROR | R1_CARD_ECC_FAILED | R1_WP_VIOLATION | R1_OUT_OF_RANGE)
+#define HALT_UNHALT_ERR		0x00000001
+#define CQ_EN_DIS_ERR		0x00000002
+#define RPMB_SWITCH_ERR		0x00000004
+#define CQERR_MASK	(HALT_UNHALT_ERR | CQ_EN_DIS_ERR | RPMB_SWITCH_ERR)
 
 struct mmc_cid {
 	unsigned int		manfid;
@@ -342,6 +349,24 @@ enum mmc_pon_type {
 
 #define MMC_QUIRK_CMDQ_DELAY_BEFORE_DCMD 6 /* microseconds */
 
+struct mmc_card_error_log {
+	char	type[4];	// sbc, cmd, data, stop, busy
+	int	err_type;
+	u32	status;
+	u64	first_issue_time;
+	u64	last_issue_time;
+	u32	count;
+	u32     ge_cnt;         // status[19] : general error or unknown error
+	u32     cc_cnt;         // status[20] : internal card controller error
+	u32     ecc_cnt;        // status[21] : ecc error
+	u32     wp_cnt;         // status[26] : write protection error
+	u32     oor_cnt;        // status[31] : out of range error
+	u32	halt_cnt;	// cq halt / unhalt fail
+	u32	cq_cnt;		// cq enable / disable fail
+	u32	rpmb_cnt;	// RPMB switch fail
+	u32     noti_cnt;       // uevent notification count
+};
+
 /*
  * MMC device
  */
@@ -441,6 +466,13 @@ struct mmc_card {
 	struct mmc_bkops_info bkops;
 	bool err_in_sdr104;
 	bool sdr104_blocked;
+
+	struct device_attribute error_count;
+	struct mmc_card_error_log err_log[10];
+
+#if defined(CONFIG_MMC_CQ_HCI) && defined(CONFIG_MMC_DATA_LOG)
+	atomic_t	log_count;
+#endif
 };
 
 /*
@@ -741,4 +773,6 @@ extern struct mmc_wr_pack_stats *mmc_blk_get_packed_statistics(
 extern void mmc_blk_init_packed_statistics(struct mmc_card *card);
 extern int mmc_send_pon(struct mmc_card *card);
 extern void mmc_blk_cmdq_req_done(struct mmc_request *mrq);
+extern void mmc_cmdq_error_logging(struct mmc_card *card,
+		struct mmc_cmdq_req *cqrq, u32 status);
 #endif /* LINUX_MMC_CARD_H */
