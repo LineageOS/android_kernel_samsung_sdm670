@@ -155,4 +155,6 @@ extern int icnss_get_curr_therm_state(struct device *dev,
 					unsigned long *thermal_state);
 extern int icnss_idle_restart(struct device *dev);
 extern int icnss_idle_shutdown(struct device *dev);
+extern int cnss_sysfs_get_pm_info(void);
+extern void cnss_sysfs_update_driver_status(int32_t new_status, void *version, void *softap);
 #endif /* _ICNSS_WLAN_H_ */

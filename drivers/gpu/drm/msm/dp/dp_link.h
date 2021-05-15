@@ -110,6 +110,11 @@ struct dp_link {
 	u32 sink_request;
 	u32 test_response;
 
+#ifdef CONFIG_SEC_DISPLAYPORT
+	bool poor_connection;
+	int status_update_cnt;
+#endif
+
 	struct dp_link_sink_count sink_count;
 	struct dp_link_test_video test_video;
 	struct dp_link_test_audio test_audio;

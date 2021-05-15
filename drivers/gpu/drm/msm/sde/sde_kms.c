@@ -59,6 +59,10 @@
 #define MEM_PROTECT_SD_CTRL_SWITCH 0x18
 #define MDP_DEVICE_ID            0x1A
 
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+#include <linux/sec_debug.h>
+#endif
+
 static const char * const iommu_ports[] = {
 		"mdp_0",
 };
@@ -835,6 +839,13 @@ static int _sde_kms_release_splash_buffer(unsigned int mem_addr,
 
 	if (!mem_addr || !size)
 		SDE_ERROR("invalid params\n");
+
+#if defined(CONFIG_DISPLAY_SAMSUNG) && defined(CONFIG_SEC_DEBUG)
+	if (sec_debug_is_enabled()) {
+		pr_info("skip to free splash memory\n");
+		return 0;
+	}
+#endif
 
 	pfn_start = mem_addr >> PAGE_SHIFT;
 	pfn_end = (mem_addr + size) >> PAGE_SHIFT;
@@ -3020,6 +3031,11 @@ static int sde_kms_pm_resume(struct device *dev)
 	return 0;
 }
 
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+extern int ss_dsi_panel_event_handler(
+		int display_ndx, enum mdss_intf_events event, void *arg);
+#endif
+
 static const struct msm_kms_funcs kms_funcs = {
 	.hw_init         = sde_kms_hw_init,
 	.postinit        = sde_kms_postinit,
@@ -3049,6 +3065,10 @@ static const struct msm_kms_funcs kms_funcs = {
 	.get_address_space = _sde_kms_get_address_space,
 	.postopen = _sde_kms_post_open,
 	.check_for_splash = sde_kms_check_for_splash,
+
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+	.ss_callback	= ss_dsi_panel_event_handler,
+#endif
 };
 
 /* the caller api needs to turn on clock before calling it */

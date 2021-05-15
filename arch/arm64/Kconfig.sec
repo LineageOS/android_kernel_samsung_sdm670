@@ -1,0 +1,49 @@
+config SEC_GTS4LV_PROJECT
+        depends on ARCH_SDM670
+        default n
+        bool "Samsung GTS4LV Project"
+        help
+          Support for Samsung GTS4LV Project
+
+config SEC_GTS4LV_MEA_PROJECT
+        depends on SEC_GTS4LV_PROJECT
+        default n
+        bool "Samsung GTS4LV MEA Project"
+        help
+          Support for Samsung GTS4LV MEA Project
+
+config SEC_GTS4LV_EUR_PROJECT
+        depends on SEC_GTS4LV_PROJECT
+        default n
+        bool "Samsung GTS4LV EUR OPEN Project"
+        help
+          Support for Samsung GTS4LV EUR OPEN Project
+
+config SEC_GTS4LVWIFI_EUR_PROJECT
+        depends on SEC_GTS4LV_PROJECT
+        default n
+        bool "Samsung GTS4LVWIFI EUR OPEN Project"
+        help
+          Support for Samsung GTS4LVWIFI EUR OPEN Project
+
+config SEC_GTS4LVWIFI_EUR_LDU_PROJECT
+        depends on SEC_GTS4LV_PROJECT
+        default n
+        bool "Samsung GTS4LVWIFI EUR LDU Project"
+        help
+          Support for Samsung GTS4LVWIFI EUR LDU Project
+
+config SEC_GTS4LV_KOR_PROJECT
+        depends on SEC_GTS4LV_PROJECT
+        default n
+        bool "Samsung GTS4LV KOR OPEN Project"
+        help
+          Support for Samsung GTS4LV KOR OPEN Project
+
+config SEC_GTS4LV_USA_PROJECT
+        depends on SEC_GTS4LV_PROJECT
+        default n
+        bool "Samsung GTS4LV USA Project"
+        help
+          Support for Samsung GTS4LV USA Project
+

@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -213,7 +213,6 @@ struct cam_camnoc_err_logger_info {
 	uint32_t errlog3_high;
 };
 
-
 /**
  * struct cam_camnoc_info : Overall CAMNOC settings info
  *
@@ -224,6 +223,7 @@ struct cam_camnoc_err_logger_info {
  * @irq_err_size: Array size of IRQ Error settings
  * @err_logger: Pointer to CAMNOC IRQ Error logger read registers
  * @errata_wa_list: HW Errata workaround info
+ *
  */
 struct cam_camnoc_info {
 	struct cam_camnoc_specific *specific;

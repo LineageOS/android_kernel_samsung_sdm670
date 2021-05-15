@@ -505,6 +505,9 @@ int usb_gadget_set_selfpowered(struct usb_gadget *gadget)
 {
 	int ret = 0;
 
+        if (!gadget || !gadget->ops)
+                return -ENODEV;
+
 	if (!gadget->ops->set_selfpowered) {
 		ret = -EOPNOTSUPP;
 		goto out;
@@ -1297,13 +1300,15 @@ EXPORT_SYMBOL_GPL(usb_add_gadget_udc);
 
 static void usb_gadget_remove_driver(struct usb_udc *udc)
 {
-	dev_dbg(&udc->dev, "unregistering UDC driver [%s]\n",
+	dev_err(&udc->dev, "unregistering UDC driver [%s]\n",
 			udc->driver->function);
 
 	kobject_uevent(&udc->dev.kobj, KOBJ_CHANGE);
 
 	usb_gadget_disconnect(udc->gadget);
 	udc->driver->disconnect(udc->gadget);
+	dev_err(&udc->dev, "unregistering UDC driver [%s] pullup disabled\n",
+			udc->driver->function);
 	udc->driver->unbind(udc->gadget);
 	usb_gadget_udc_stop(udc);
 

@@ -59,6 +59,15 @@
 /* max size supported for dsi cmd transfer using TPG */
 #define DSI_CTRL_MAX_CMD_FIFO_STORE_SIZE 64
 
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+/* max size supported for dsi cmd transfer using DMA */
+#ifdef CONFIG_SEC_A8SQLTE_PROJECT
+#define DSI_CTRL_MAX_CMD_FET_MEMORY_SIZE 100
+#else
+#define DSI_CTRL_MAX_CMD_FET_MEMORY_SIZE 200
+#endif
+#endif
+
 /**
  * enum dsi_channel_id - defines dsi channel id.
  * @DSI_CTRL_LEFT:    DSI 0 channel

@@ -593,6 +593,36 @@ power_attr(pm_freeze_timeout);
 
 #endif	/* CONFIG_FREEZER*/
 
+#ifdef CONFIG_SEC_PM
+extern int qpnp_set_resin_wk_int(int en);
+static int volkey_wakeup = 1;
+static ssize_t volkey_wakeup_show(struct kobject *kobj,
+				  struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", volkey_wakeup);
+}
+
+static ssize_t volkey_wakeup_store(struct kobject *kobj,
+				   struct kobj_attribute *attr,
+				   const char *buf, size_t n)
+{
+	int val;
+
+	if (kstrtoint(buf, 10, &val) < 0)
+		return -EINVAL;
+
+	if (volkey_wakeup == val)
+		return n;
+
+	volkey_wakeup = val;
+	qpnp_set_resin_wk_int(volkey_wakeup);
+
+	return n;
+
+}
+power_attr(volkey_wakeup);
+#endif /* CONFIG_SEC_PM */
+
 static struct attribute * g[] = {
 	&state_attr.attr,
 #ifdef CONFIG_PM_TRACE
@@ -619,6 +649,9 @@ static struct attribute * g[] = {
 #endif
 #ifdef CONFIG_FREEZER
 	&pm_freeze_timeout_attr.attr,
+#endif
+#ifdef CONFIG_SEC_PM
+	&volkey_wakeup_attr.attr,
 #endif
 	NULL,
 };

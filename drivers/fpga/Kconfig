@@ -28,4 +28,9 @@ config FPGA_MGR_ZYNQ_FPGA
 
 endif # FPGA
 
+config POGO_FPGA
+	tristate "fpga for pogo keyboard"
+	help
+	  FPGA manager driver support for pogo fpga.
+
 endmenu

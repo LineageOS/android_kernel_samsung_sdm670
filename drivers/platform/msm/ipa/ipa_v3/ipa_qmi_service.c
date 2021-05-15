@@ -609,7 +609,9 @@ static int ipa3_qmi_init_modem_send_sync_msg(void)
 			QMI_SEND_REQ_TIMEOUT_MS);
 	pr_info("QMI_IPA_INIT_MODEM_DRIVER_REQ_V01 response received\n");
 
+#ifdef CONFIG_MSM_BOOT_TIME_MARKER
 	place_marker("M - QMI ready for commands");
+#endif
 
 	return ipa3_check_qmi_response(rc,
 		QMI_IPA_INIT_MODEM_DRIVER_REQ_V01, resp.resp.result,

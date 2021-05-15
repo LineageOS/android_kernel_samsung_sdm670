@@ -41,6 +41,10 @@
 #include "pinctrl-msm.h"
 #include "../pinctrl-utils.h"
 
+#ifdef CONFIG_SEC_PM_DEBUG
+#include <linux/sec-pinmux.h>
+#endif
+
 #define MAX_NR_GPIO 300
 #define PS_HOLD_OFFSET 0x820
 
@@ -152,6 +156,16 @@ static int msm_pinmux_set_mux(struct pinctrl_dev *pctldev,
 	u32 val, mask;
 	int i;
 
+#ifdef ENABLE_SENSORS_FPRINT_SECURE
+	if (group >= CONFIG_SENSORS_FP_SPI_GPIO_START
+		&& group <= CONFIG_SENSORS_FP_SPI_GPIO_END)
+		return 0;
+#endif
+#ifdef CONFIG_ESE_SECURE
+	if (group >= CONFIG_ESE_SPI_GPIO_START
+		&& group <= CONFIG_ESE_SPI_GPIO_END)
+		return 0;
+#endif
 	g = &pctrl->soc->groups[group];
 	mask = GENMASK(g->mux_bit + order_base_2(g->nfuncs) - 1, g->mux_bit);
 
@@ -235,6 +249,17 @@ static int msm_config_group_get(struct pinctrl_dev *pctldev,
 	int ret;
 	u32 val;
 
+#ifdef ENABLE_SENSORS_FPRINT_SECURE
+	if (group >= CONFIG_SENSORS_FP_SPI_GPIO_START
+		&& group <= CONFIG_SENSORS_FP_SPI_GPIO_END)
+		return 0;
+#endif
+#ifdef CONFIG_ESE_SECURE
+	if (group >= CONFIG_ESE_SPI_GPIO_START
+		&& group <= CONFIG_ESE_SPI_GPIO_END)
+		return 0;
+#endif
+
 	g = &pctrl->soc->groups[group];
 
 	ret = msm_config_reg(pctrl, g, param, &mask, &bit);
@@ -299,6 +324,17 @@ static int msm_config_group_set(struct pinctrl_dev *pctldev,
 	int ret;
 	u32 val;
 	int i;
+
+#ifdef ENABLE_SENSORS_FPRINT_SECURE
+	if (group >= CONFIG_SENSORS_FP_SPI_GPIO_START
+		&& group <= CONFIG_SENSORS_FP_SPI_GPIO_END)
+		return 0;
+#endif
+#ifdef CONFIG_ESE_SECURE
+	if (group >= CONFIG_ESE_SPI_GPIO_START
+		&& group <= CONFIG_ESE_SPI_GPIO_END)
+		return 0;
+#endif
 
 	g = &pctrl->soc->groups[group];
 
@@ -465,6 +501,123 @@ static void msm_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
 	spin_unlock_irqrestore(&pctrl->lock, flags);
 }
 
+#ifdef CONFIG_SEC_PM_DEBUG
+int msm_set_gpio_status(struct gpio_chip *chip, uint pin_no, uint id, bool level)
+{
+	const struct msm_pingroup *g;
+	struct msm_pinctrl *pctrl = container_of(chip, struct msm_pinctrl, chip);
+	u32 cfg_val, inout_val;
+	u32 mask = 0, shft = 0, data;
+
+#ifdef ENABLE_SENSORS_FPRINT_SECURE
+	if (pin_no >= CONFIG_SENSORS_FP_SPI_GPIO_START
+		&& pin_no <= CONFIG_SENSORS_FP_SPI_GPIO_END)
+		return 0;
+#endif
+#ifdef CONFIG_ESE_SECURE
+	if (pin_no >= CONFIG_ESE_SPI_GPIO_START
+		&& pin_no <= CONFIG_ESE_SPI_GPIO_END)
+		return 0;
+#endif
+
+	g = &pctrl->soc->groups[pin_no];
+
+	inout_val = readl(pctrl->regs + g->io_reg);
+	cfg_val = readl(pctrl->regs + g->ctl_reg);
+
+	/* Get mask and shft values for this config type */
+	switch (id) {
+	case GPIO_DVS_CFG_PULL_DOWN:
+		mask = GPIOMUX_PULL_MASK;
+		shft = GPIOMUX_PULL_SHFT;
+		data = GPIOMUX_PULL_DOWN;
+		break;
+	case GPIO_DVS_CFG_PULL_UP:
+		mask = GPIOMUX_PULL_MASK;
+		shft = GPIOMUX_PULL_SHFT;
+		data = GPIOMUX_PULL_UP;
+		break;
+	case GPIO_DVS_CFG_PULL_NONE:
+		mask = GPIOMUX_PULL_MASK;
+		shft = GPIOMUX_PULL_SHFT;
+		data = GPIOMUX_PULL_NONE;
+		break;
+	case GPIO_DVS_CFG_OUTPUT:
+		mask = GPIOMUX_DIR_MASK;
+		shft = GPIOMUX_DIR_SHFT;
+		data = level;
+		inout_val = dir_to_inout_val(data);
+		writel(inout_val, pctrl->regs + g->io_reg);
+		data = mask;
+		break;
+	default:
+		return -EINVAL;
+	};
+
+	cfg_val &= ~(mask << shft);
+	cfg_val |= (data << shft);
+	writel(cfg_val, pctrl->regs + g->ctl_reg);
+
+	return 0;
+}
+
+void msm_gp_get_cfg(struct gpio_chip *chip, uint pin_no, struct gpiomux_setting *val)
+{
+	const struct msm_pingroup *g;
+	struct msm_pinctrl *pctrl = container_of(chip, struct msm_pinctrl, chip);
+	u32 cfg_val, inout_val;
+	g = &pctrl->soc->groups[pin_no];
+
+#ifdef ENABLE_SENSORS_FPRINT_SECURE
+	if (pin_no >= CONFIG_SENSORS_FP_SPI_GPIO_START
+		&& pin_no <= CONFIG_SENSORS_FP_SPI_GPIO_END)
+		return;
+#endif
+#ifdef CONFIG_ESE_SECURE
+	if (pin_no >= CONFIG_ESE_SPI_GPIO_START
+		&& pin_no <= CONFIG_ESE_SPI_GPIO_END)
+		return;
+#endif
+	inout_val = readl(pctrl->regs + g->io_reg);
+	cfg_val = readl(pctrl->regs + g->ctl_reg);
+	val->pull = cfg_val & 0x3;
+	val->func = (cfg_val >> 2) & 0xf;
+	val->drv = (cfg_val >> 6) & 0x7;
+	val->dir = cfg_val & BIT_MASK(9) ? 1 : GPIOMUX_IN;
+	if ((val->func == GPIOMUX_FUNC_GPIO) && (val->dir))
+		val->dir = inout_val & BIT_MASK(1) ?
+		GPIOMUX_OUT_HIGH : GPIOMUX_OUT_LOW;
+}
+
+int msm_gp_get_value(struct gpio_chip *chip, uint pin_no, int in_out_type)
+{
+	const struct msm_pingroup *g;
+	struct msm_pinctrl *pctrl = container_of(chip, struct msm_pinctrl, chip);
+	u32 inout_val;
+
+	g = &pctrl->soc->groups[pin_no];
+
+#ifdef ENABLE_SENSORS_FPRINT_SECURE
+	if (pin_no >= CONFIG_SENSORS_FP_SPI_GPIO_START
+		&& pin_no <= CONFIG_SENSORS_FP_SPI_GPIO_END)
+		return 0;
+#endif
+#ifdef CONFIG_ESE_SECURE
+	if (pin_no >= CONFIG_ESE_SPI_GPIO_START
+		&& pin_no <= CONFIG_ESE_SPI_GPIO_END)
+		return 0;
+#endif
+
+	inout_val = readl(pctrl->regs + g->io_reg);
+
+	if(in_out_type == GPIOMUX_IN)
+		return (inout_val & BIT(GPIO_IN_BIT)) >> GPIO_IN_BIT;
+
+	return (inout_val & BIT(GPIO_OUT_BIT)) >> GPIO_OUT_BIT;
+}
+#endif
+
+
 #ifdef CONFIG_DEBUG_FS
 #include <linux/seq_file.h>
 
@@ -508,6 +661,17 @@ static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
 	unsigned i;
 
 	for (i = 0; i < chip->ngpio; i++, gpio++) {
+#ifdef ENABLE_SENSORS_FPRINT_SECURE
+		if (i >= CONFIG_SENSORS_FP_SPI_GPIO_START
+			&& i <= CONFIG_SENSORS_FP_SPI_GPIO_END)
+			continue;
+#endif
+#ifdef CONFIG_ESE_SECURE
+		if (i >= CONFIG_ESE_SPI_GPIO_START
+			&& i <= CONFIG_ESE_SPI_GPIO_END)
+			continue;
+#endif
+
 		msm_gpio_dbg_show_one(s, NULL, chip, i, gpio);
 		seq_puts(s, "\n");
 	}
