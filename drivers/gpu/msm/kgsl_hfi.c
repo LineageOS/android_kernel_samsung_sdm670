@@ -184,6 +184,10 @@ static void receive_ack_msg(struct gmu_device *gmu, struct hfi_msg_rsp *rsp)
 		rsp->ret_hdr.seqnum);
 
 	spin_lock_bh(&hfi->msglock);
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+	if (list_empty(&hfi->msglist))
+		goto __fail;
+#endif
 	list_for_each_entry_safe(msg, next, &hfi->msglist, node) {
 		if (msg->msg_id == rsp->ret_hdr.id &&
 				msg->seqnum == rsp->ret_hdr.seqnum) {
@@ -191,7 +195,9 @@ static void receive_ack_msg(struct gmu_device *gmu, struct hfi_msg_rsp *rsp)
 			break;
 		}
 	}
-
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+__fail:
+#endif
 	if (in_queue == false) {
 		spin_unlock_bh(&hfi->msglock);
 		dev_err(&gmu->pdev->dev,
@@ -202,6 +208,7 @@ static void receive_ack_msg(struct gmu_device *gmu, struct hfi_msg_rsp *rsp)
 
 	memcpy(&msg->results, (void *) rsp, rsp->hdr.size << 2);
 	complete(&msg->msg_complete);
+
 	spin_unlock_bh(&hfi->msglock);
 }
 

@@ -58,6 +58,10 @@
 
 #include "mdss_mdp_trace.h"
 
+#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
+#include "samsung/ss_dsi_panel_common.h"
+#endif
+
 #define AXI_HALT_TIMEOUT_US	0x4000
 #define AUTOSUSPEND_TIMEOUT_MS	200
 #define DEFAULT_MDP_PIPE_WIDTH	2048
@@ -100,7 +104,11 @@ static struct mdss_panel_intf pan_types[] = {
 	{"hdmi", MDSS_PANEL_INTF_HDMI},
 	{"spi", MDSS_PANEL_INTF_SPI},
 };
+#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
+char mdss_mdp_panel[MDSS_MAX_PANEL_LEN];
+#else
 static char mdss_mdp_panel[MDSS_MAX_PANEL_LEN];
+#endif
 
 struct mdss_hw mdss_mdp_hw = {
 	.hw_ndx = MDSS_HW_MDP,
@@ -2972,6 +2980,10 @@ static int mdss_mdp_probe(struct platform_device *pdev)
 			mdss_mdp_footswitch_ctrl_splash(true);
 	}
 
+#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
+	if (!mdss_panel_attached(DISPLAY_1) && !mdss_panel_attached(DISPLAY_2))
+		mdata->handoff_pending = false;
+#endif
 	mdp_intr_cb  = kcalloc(ARRAY_SIZE(mdp_irq_map),
 			sizeof(struct intr_callback), GFP_KERNEL);
 	if (mdp_intr_cb == NULL)
