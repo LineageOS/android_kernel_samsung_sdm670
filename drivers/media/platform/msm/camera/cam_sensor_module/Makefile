@@ -7,5 +7,7 @@ obj-$(CONFIG_SPECTRA_CAMERA) += cam_actuator/
 obj-$(CONFIG_SPECTRA_CAMERA) += cam_sensor/
 obj-$(CONFIG_SPECTRA_CAMERA) += cam_flash/
 obj-$(CONFIG_SPECTRA_CAMERA) += cam_eeprom/
+ifneq ($(CONFIG_DISABLE_OIS_SDM710), y)
 obj-$(CONFIG_SPECTRA_CAMERA) += cam_ois/
-obj-$(CONFIG_SPECTRA_CAMERA) += cam_ir_led/
+endif
+obj-$(CONFIG_SPECTRA_CAMERA) += cam_aperture/

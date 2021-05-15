@@ -39,6 +39,14 @@
 #include <linux/psi.h>
 #include "internal.h"
 
+#if defined(CONFIG_SDP)
+#include <sdp/cache_cleanup.h>
+#endif
+
+#ifdef CONFIG_FSCRYPT_SDP
+#include <linux/fscrypto_sdp_cache.h>
+#endif
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/filemap.h>
 
@@ -248,6 +256,11 @@ void __delete_from_page_cache(struct page *page, void *shadow)
 {
 	struct address_space *mapping = page->mapping;
 	int nr = hpage_nr_pages(page);
+
+#if defined(CONFIG_SDP)
+	if (mapping_sensitive(mapping))
+		sdp_page_cleanup(page);
+#endif
 
 	trace_mm_filemap_delete_from_page_cache(page);
 	/*
@@ -2124,7 +2137,18 @@ generic_file_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 			goto out;
 	}
 
+#ifdef CONFIG_FSCRYPT_SDP
+	//Check after writeback is completed.
+	if (fscrypt_sdp_file_not_readable(iocb->ki_filp)) {
+		retval = -EIO;
+		goto out;
+	}
+#endif
+
 	retval = do_generic_file_read(file, &iocb->ki_pos, iter, retval);
+#ifdef CONFIG_FSCRYPT_SDP
+	fscrypt_sdp_unset_file_io_ongoing(iocb->ki_filp);
+#endif
 out:
 	return retval;
 }
@@ -2194,6 +2218,28 @@ static int lock_page_maybe_drop_mmap(struct vm_area_struct *vma,
 	return 1;
 }
 
+static noinline void tracing_mark_write(bool start, struct file *file, pgoff_t offset, unsigned int size, bool sync)
+{
+	char buf[256], *path;
+
+	if (!tracing_is_on() || file == NULL || file->f_path.dentry == NULL)
+		return;
+
+	if (start) {
+		path = dentry_path(file->f_path.dentry, buf, 256);
+
+		if (!IS_ERR(path))
+			trace_printk("B|%d|%d , %s , %lu , %d\n", current->tgid, sync, path, offset, size);
+		else
+			trace_printk("B|%d|%d , %s , %lu , %d\n", current->tgid, sync, "dentry_path failed", offset, size);
+	} else {
+		trace_printk("E|%d\n", current->tgid);
+	}
+}
+
+#define trace_fault_file_path_start(...) tracing_mark_write(1, ##__VA_ARGS__)
+#define trace_fault_file_path_end(...) tracing_mark_write(0, ##__VA_ARGS__)
+
 /*
  * Synchronous readahead happens when we don't even find a page in the page
  * cache at all.  We don't want to perform IO under the mmap sem, so if we have
@@ -2209,6 +2255,7 @@ static struct file *do_sync_mmap_readahead(struct vm_area_struct *vma,
 {
 	struct file *fpin = NULL;
 	struct address_space *mapping = file->f_mapping;
+	unsigned int ra_pages;
 
 	/* If we don't want any read-ahead, don't bother */
 	if (vma->vm_flags & VM_RAND_READ)
@@ -2218,8 +2265,10 @@ static struct file *do_sync_mmap_readahead(struct vm_area_struct *vma,
 
 	if (vma->vm_flags & VM_SEQ_READ) {
 		fpin = maybe_unlock_mmap_for_io(vma, flags, fpin);
+		trace_fault_file_path_start(file, offset, ra->ra_pages, 1);
 		page_cache_sync_readahead(mapping, ra, file, offset,
 					  ra->ra_pages);
+		trace_fault_file_path_end(file, offset, ra->ra_pages, 1);
 		return fpin;
 	}
 
@@ -2238,10 +2287,20 @@ static struct file *do_sync_mmap_readahead(struct vm_area_struct *vma,
 	 * mmap read-around
 	 */
 	fpin = maybe_unlock_mmap_for_io(vma, flags, fpin);
-	ra->start = max_t(long, 0, offset - ra->ra_pages / 2);
-	ra->size = ra->ra_pages;
-	ra->async_size = ra->ra_pages / 4;
+#if CONFIG_MMAP_READAROUND_LIMIT == 0
+	ra_pages = ra->ra_pages;
+#else
+	if (ra->ra_pages > CONFIG_MMAP_READAROUND_LIMIT)
+		ra_pages = CONFIG_MMAP_READAROUND_LIMIT;
+	else
+		ra_pages = ra->ra_pages;
+#endif
+	ra->start = max_t(long, 0, offset - ra_pages / 2);
+	ra->size = ra_pages;
+	ra->async_size = ra_pages / 4;
+	trace_fault_file_path_start(file, offset, ra_pages, 1);
 	ra_submit(ra, mapping, file);
+	trace_fault_file_path_end(file, offset, ra_pages, 1);
 	return fpin;
 }
 
@@ -2267,8 +2326,10 @@ static struct file *do_async_mmap_readahead(struct vm_area_struct *vma,
 		ra->mmap_miss--;
 	if (PageReadahead(page)) {
 		fpin = maybe_unlock_mmap_for_io(vma, flags, fpin);
+		trace_fault_file_path_start(file, offset, ra->ra_pages, 0);
 		page_cache_async_readahead(mapping, ra, file,
 					   page, offset, ra->ra_pages);
+		trace_fault_file_path_end(file, offset, ra->ra_pages, 0);
 	}
 	return fpin;
 }
@@ -2393,7 +2454,9 @@ page_not_uptodate:
 	 */
 	ClearPageError(page);
 	fpin = maybe_unlock_mmap_for_io(vma, vmf->flags, fpin);
+	trace_fault_file_path_start(file, offset, 1, 1);
 	error = mapping->a_ops->readpage(file, page);
+	trace_fault_file_path_end(file, offset, 1, 1);
 	if (!error) {
 		wait_on_page_locked(page);
 		if (!PageUptodate(page))
