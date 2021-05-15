@@ -86,6 +86,9 @@ if INET
 source "net/ipv4/Kconfig"
 source "net/ipv6/Kconfig"
 source "net/netlabel/Kconfig"
+#ifdef CONFIG_MPTCP
+	source "net/mptcp/Kconfig"
+#endif
 
 endif # if INET
 
@@ -245,6 +248,9 @@ source "net/l3mdev/Kconfig"
 source "net/qrtr/Kconfig"
 source "net/ncsi/Kconfig"
 source "net/rmnet_data/Kconfig"
+# KNOX NPA - START
+source "net/ncm/Kconfig"
+# KNOX NPA - END
 
 config RPS
 	bool

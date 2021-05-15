@@ -37,10 +37,10 @@
  *				   and transfer it.
  * @DSI_CTRL_CMD_LAST_COMMAND:     Trigger the DMA cmd transfer if this is last
  *				   command in the batch.
- * @DSI_CTRL_CMD_NON_EMBEDDED_MODE:Trasfer cmd packets in non embedded mode.
+ * @DSI_CTRL_CMD_NON_EMBEDDED_MODE:Transfer cmd packets in non embedded mode.
  * @DSI_CTRL_CMD_CUSTOM_DMA_SCHED: Use the dma scheduling line number defined in
  *				   display panel dtsi file instead of default.
- */
+*/
 #define DSI_CTRL_CMD_READ             0x1
 #define DSI_CTRL_CMD_BROADCAST        0x2
 #define DSI_CTRL_CMD_BROADCAST_MASTER 0x4
@@ -59,6 +59,14 @@
 /* max size supported for dsi cmd transfer using TPG */
 #define DSI_CTRL_MAX_CMD_FIFO_STORE_SIZE 64
 
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+/* max size supported for dsi cmd transfer using DMA */
+#ifdef CONFIG_SEC_A8SQLTE_PROJECT
+#define DSI_CTRL_MAX_CMD_FET_MEMORY_SIZE 100
+#else
+#define DSI_CTRL_MAX_CMD_FET_MEMORY_SIZE 200
+#endif
+#endif
 /**
  * enum dsi_channel_id - defines dsi channel id.
  * @DSI_CTRL_LEFT:    DSI 0 channel
@@ -573,7 +581,7 @@ int dsi_ctrl_set_cmd_engine_state(struct dsi_ctrl *dsi_ctrl,
  *
  * Validate DSI cotroller host state
  *
- * Return: boolean indicating whether host is not initalized.
+ * Return: boolean indicating whether host is not initialized.
  */
 bool dsi_ctrl_validate_host_state(struct dsi_ctrl *dsi_ctrl);
 
@@ -632,7 +640,7 @@ int dsi_ctrl_clk_cb_register(struct dsi_ctrl *dsi_ctrl,
  * @enable:               enable/disable clamping.
  * @ulps_enabled:         ulps state.
  *
- * Clamps can be enabled/disabled while DSI contoller is still turned on.
+ * Clamps can be enabled/disabled while DSI controller is still turned on.
  *
  * Return: error code.
  */

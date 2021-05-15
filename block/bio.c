@@ -601,6 +601,7 @@ void __bio_clone_fast(struct bio *bio, struct bio *bio_src)
 	bio->bi_opf = bio_src->bi_opf;
 	bio->bi_iter = bio_src->bi_iter;
 	bio->bi_io_vec = bio_src->bi_io_vec;
+	bio->bi_sec_flags = bio_src->bi_sec_flags;
 #ifdef CONFIG_PFK
 	bio->bi_dio_inode = bio_src->bi_dio_inode;
 #endif
@@ -687,6 +688,7 @@ struct bio *bio_clone_bioset(struct bio *bio_src, gfp_t gfp_mask,
 	bio->bi_opf		= bio_src->bi_opf;
 	bio->bi_iter.bi_sector	= bio_src->bi_iter.bi_sector;
 	bio->bi_iter.bi_size	= bio_src->bi_iter.bi_size;
+	bio->bi_sec_flags	= bio_src->bi_sec_flags;
 
 	switch (bio_op(bio)) {
 	case REQ_OP_DISCARD:
