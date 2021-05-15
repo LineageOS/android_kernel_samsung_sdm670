@@ -203,6 +203,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	u32			temp, imod;
 	unsigned long		flags;
 
+	pr_info("%s\n", __func__);
 	if (usb_disabled())
 		return -ENODEV;
 
@@ -330,6 +331,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	if (device_property_read_u32(&pdev->dev, "usb-core-id", &xhci->core_id))
 		xhci->core_id = -EINVAL;
 
+#if !defined(CONFIG_USB_DWC3_MSM)
 	hcd->usb_phy = devm_usb_get_phy_by_phandle(phydev, "usb-phy", 0);
 	if (IS_ERR(hcd->usb_phy)) {
 		ret = PTR_ERR(hcd->usb_phy);
@@ -341,6 +343,9 @@ static int xhci_plat_probe(struct platform_device *pdev)
 		if (ret)
 			goto put_usb3_hcd;
 	}
+#else
+	hcd->usb_phy = NULL;
+#endif
 
 	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
 	if (ret)
@@ -377,6 +382,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	pm_runtime_mark_last_busy(&pdev->dev);
 	pm_runtime_put_autosuspend(&pdev->dev);
 
+	pr_info("%s --\n", __func__);
 	return 0;
 
 
@@ -386,8 +392,10 @@ dealloc_usb2_hcd:
 disable_usb_phy:
 	usb_phy_shutdown(hcd->usb_phy);
 
+#if !defined(CONFIG_USB_DWC3_MSM)
 put_usb3_hcd:
 	usb_put_hcd(xhci->shared_hcd);
+#endif	
 
 disable_clk:
 	if (!IS_ERR(clk))

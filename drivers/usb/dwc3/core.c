@@ -186,6 +186,9 @@ static int dwc3_init_usb_phys(struct dwc3 *dwc)
 {
 	int		ret;
 
+	pr_err("%s: dwc->maximum_speed %d\n",
+				__func__, dwc->maximum_speed);
+	
 	/* Bring up PHYs */
 	ret = usb_phy_init(dwc->usb2_phy);
 	if (ret) {
@@ -1119,6 +1122,7 @@ static int dwc3_probe(struct platform_device *pdev)
 
 	void __iomem		*regs;
 	void			*mem;
+	u8			usb3_lpm_capable = 1;
 
 	if (count >= DWC_CTRL_COUNT) {
 		dev_err(dev, "Err dwc instance %d >= %d available\n",
@@ -1188,7 +1192,7 @@ static int dwc3_probe(struct platform_device *pdev)
 	dwc->regs_size	= resource_size(res);
 
 	/* default to highest possible threshold */
-	lpm_nyet_threshold = 0xf;
+	lpm_nyet_threshold = 0x0;
 
 	/* default to -3.5dB de-emphasis */
 	tx_de_emphasis = 1;
@@ -1232,8 +1236,10 @@ static int dwc3_probe(struct platform_device *pdev)
 	dwc->core_id = -1;
 	device_property_read_u32(dev, "usb-core-id", &dwc->core_id);
 
-	dwc->usb3_lpm_capable = device_property_read_bool(dev,
-				"snps,usb3_lpm_capable");
+	device_property_read_u8(dev, "snps,usb3_lpm_capable",
+				&usb3_lpm_capable);
+	dwc->usb3_lpm_capable = usb3_lpm_capable;
+	pr_info("%s : usb3_lpm_capable %d\n", __func__, dwc->usb3_lpm_capable);
 
 	dwc->needs_fifo_resize = device_property_read_bool(dev,
 				"tx-fifo-resize");

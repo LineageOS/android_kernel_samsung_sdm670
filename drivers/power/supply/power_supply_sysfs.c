@@ -47,20 +47,22 @@ static ssize_t power_supply_show_property(struct device *dev,
 		"Unknown", "Battery", "UPS", "Mains", "USB", "USB_DCP",
 		"USB_CDP", "USB_ACA", "USB_HVDCP", "USB_HVDCP_3", "USB_PD",
 		"Wireless", "USB_FLOAT", "BMS", "Parallel", "Main", "Wipower",
-		"TYPEC", "TYPEC_UFP", "TYPEC_DFP"
+		"TYPEC", "TYPEC_UFP", "TYPEC_DFP",
+		"POWER_SHARING", "OTG", "POGO",
 	};
 	static char *status_text[] = {
 		"Unknown", "Charging", "Discharging", "Not charging", "Full"
 	};
 	static char *charge_type[] = {
 		"Unknown", "N/A", "Trickle", "Fast",
-		"Taper"
+		"Taper", "Slow"
 	};
 	static char *health_text[] = {
 		"Unknown", "Good", "Overheat", "Dead", "Over voltage",
 		"Unspecified failure", "Cold", "Watchdog timer expire",
 		"Safety timer expire",
-		"Warm", "Cool", "Hot"
+		"Warm", "Cool", "Hot",
+		"Under voltage", "OverheatLimit"
 	};
 	static char *technology_text[] = {
 		"Unknown", "NiMH", "Li-ion", "Li-poly", "LiFe", "NiCd",
@@ -72,7 +74,7 @@ static ssize_t power_supply_show_property(struct device *dev,
 	static char *scope_text[] = {
 		"Unknown", "System", "Device"
 	};
-	static const char * const typec_text[] = {
+	static char *typec_text[] = {
 		"Nothing attached", "Sink attached", "Powered cable w/ sink",
 		"Debug Accessory", "Audio Adapter", "Powered cable w/o sink",
 		"Source attached (default current)",
@@ -80,7 +82,7 @@ static ssize_t power_supply_show_property(struct device *dev,
 		"Source attached (high current)",
 		"Non compliant",
 	};
-	static const char * const typec_pr_text[] = {
+	static char *typec_pr_text[] = {
 		"none", "dual power role", "sink", "source"
 	};
 	ssize_t ret = 0;
@@ -97,7 +99,7 @@ static ssize_t power_supply_show_property(struct device *dev,
 			if (ret == -ENODATA)
 				dev_dbg(dev, "driver has no data for `%s' property\n",
 					attr->attr.name);
-			else if (ret != -ENODEV && ret != -EAGAIN)
+			else if (ret != -ENODEV)
 				dev_err_ratelimited(dev,
 					"driver failed to report `%s' property: %zd\n",
 					attr->attr.name, ret);
@@ -106,49 +108,35 @@ static ssize_t power_supply_show_property(struct device *dev,
 	}
 
 	if (off == POWER_SUPPLY_PROP_STATUS)
-		return scnprintf(buf, PAGE_SIZE, "%s\n",
-				status_text[value.intval]);
+		return sprintf(buf, "%s\n", status_text[value.intval]);
 	else if (off == POWER_SUPPLY_PROP_CHARGE_TYPE)
-		return scnprintf(buf, PAGE_SIZE, "%s\n",
-				charge_type[value.intval]);
+		return sprintf(buf, "%s\n", charge_type[value.intval]);
 	else if (off == POWER_SUPPLY_PROP_HEALTH)
-		return scnprintf(buf, PAGE_SIZE, "%s\n",
-				health_text[value.intval]);
+		return sprintf(buf, "%s\n", health_text[value.intval]);
 	else if (off == POWER_SUPPLY_PROP_TECHNOLOGY)
-		return scnprintf(buf, PAGE_SIZE, "%s\n",
-				technology_text[value.intval]);
+		return sprintf(buf, "%s\n", technology_text[value.intval]);
 	else if (off == POWER_SUPPLY_PROP_CAPACITY_LEVEL)
-		return scnprintf(buf, PAGE_SIZE, "%s\n",
-				capacity_level_text[value.intval]);
+		return sprintf(buf, "%s\n", capacity_level_text[value.intval]);
 	else if (off == POWER_SUPPLY_PROP_TYPE ||
 			off == POWER_SUPPLY_PROP_REAL_TYPE)
-		return scnprintf(buf, PAGE_SIZE, "%s\n",
-				type_text[value.intval]);
+		return sprintf(buf, "%s\n", type_text[value.intval]);
 	else if (off == POWER_SUPPLY_PROP_SCOPE)
-		return scnprintf(buf, PAGE_SIZE, "%s\n",
-				scope_text[value.intval]);
+		return sprintf(buf, "%s\n", scope_text[value.intval]);
 	else if (off == POWER_SUPPLY_PROP_TYPEC_MODE)
-		return scnprintf(buf, PAGE_SIZE, "%s\n",
-				typec_text[value.intval]);
+		return sprintf(buf, "%s\n", typec_text[value.intval]);
 	else if (off == POWER_SUPPLY_PROP_TYPEC_POWER_ROLE)
-		return scnprintf(buf, PAGE_SIZE, "%s\n",
-				typec_pr_text[value.intval]);
+		return sprintf(buf, "%s\n", typec_pr_text[value.intval]);
 	else if (off == POWER_SUPPLY_PROP_DIE_HEALTH)
-		return scnprintf(buf, PAGE_SIZE, "%s\n",
-				health_text[value.intval]);
+		return sprintf(buf, "%s\n", health_text[value.intval]);
 	else if (off == POWER_SUPPLY_PROP_CONNECTOR_HEALTH)
-		return scnprintf(buf, PAGE_SIZE, "%s\n",
-				health_text[value.intval]);
+		return sprintf(buf, "%s\n", health_text[value.intval]);
 	else if (off >= POWER_SUPPLY_PROP_MODEL_NAME)
-		return scnprintf(buf, PAGE_SIZE, "%s\n",
-				value.strval);
+		return sprintf(buf, "%s\n", value.strval);
 
 	if (off == POWER_SUPPLY_PROP_CHARGE_COUNTER_EXT)
-		return scnprintf(buf, PAGE_SIZE, "%lld\n",
-				value.int64val);
+		return sprintf(buf, "%lld\n", value.int64val);
 	else
-		return scnprintf(buf, PAGE_SIZE, "%d\n",
-				value.intval);
+		return sprintf(buf, "%d\n", value.intval);
 }
 
 static ssize_t power_supply_store_property(struct device *dev,

@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -28,20 +28,10 @@
 #define CAM_ISP_CTX_RES_MAX                     20
 
 /*
- * Maximum configuration entry size  - This is based on the
+ * Maxiimum configuration entry size  - This is based on the
  * worst case DUAL IFE use case plus some margin.
  */
 #define CAM_ISP_CTX_CFG_MAX                     22
-
-/* Maximum allowed sof count in rdi only bubble state
- * till buf_done is received for bubble req_id.
- */
-#define CAM_ISP_CTX_BUBBLE_SOF_COUNT_MAX        3
-
-/*
- * Maximum entries in state monitoring array for error logging
- */
-#define CAM_ISP_CTX_STATE_MONITOR_MAX_ENTRIES   20
 
 /* forward declaration */
 struct cam_isp_context;
@@ -62,22 +52,10 @@ enum cam_isp_ctx_activated_substate {
 	CAM_ISP_CTX_ACTIVATED_BUBBLE_APPLIED,
 	CAM_ISP_CTX_ACTIVATED_HW_ERROR,
 	CAM_ISP_CTX_ACTIVATED_HALT,
+	CAM_ISP_CTX_ACTIVATED_FLUSH,
 	CAM_ISP_CTX_ACTIVATED_MAX,
 };
 
-/**
- * enum cam_isp_state_change_trigger - Different types of ISP events
- *
- */
-enum cam_isp_state_change_trigger {
-	CAM_ISP_STATE_CHANGE_TRIGGER_ERROR,
-	CAM_ISP_STATE_CHANGE_TRIGGER_SOF,
-	CAM_ISP_STATE_CHANGE_TRIGGER_REG_UPDATE,
-	CAM_ISP_STATE_CHANGE_TRIGGER_EPOCH,
-	CAM_ISP_STATE_CHANGE_TRIGGER_EOF,
-	CAM_ISP_STATE_CHANGE_TRIGGER_DONE,
-	CAM_ISP_STATE_CHANGE_TRIGGER_MAX
-};
 
 /**
  * struct cam_isp_ctx_irq_ops - Function table for handling IRQ callbacks
@@ -88,6 +66,7 @@ enum cam_isp_state_change_trigger {
 struct cam_isp_ctx_irq_ops {
 	cam_isp_hw_event_cb_func         irq_ops[CAM_ISP_HW_EVENT_MAX];
 };
+
 
 /**
  * struct cam_isp_ctx_req - ISP context request object
@@ -104,70 +83,39 @@ struct cam_isp_ctx_irq_ops {
  *                         the request has been completed.
  * @bubble_report:         Flag to track if bubble report is active on
  *                         current request
- * @hw_update_data:        HW update data for this request
- *
+ * @hw_update_data         hw update data for this request
  */
 struct cam_isp_ctx_req {
-	struct cam_ctx_request               *base;
+	struct cam_ctx_request           *base;
 
-	struct cam_hw_update_entry            cfg[CAM_ISP_CTX_CFG_MAX];
-	uint32_t                              num_cfg;
-	struct cam_hw_fence_map_entry         fence_map_out
-						[CAM_ISP_CTX_RES_MAX];
-	uint32_t                              num_fence_map_out;
-	struct cam_hw_fence_map_entry         fence_map_in[CAM_ISP_CTX_RES_MAX];
-	uint32_t                              num_fence_map_in;
-	uint32_t                              num_acked;
-	int32_t                               bubble_report;
-	struct cam_isp_prepare_hw_update_data hw_update_data;
-	bool                                  bubble_detected;
+	struct cam_hw_update_entry        cfg[CAM_ISP_CTX_CFG_MAX];
+	uint32_t                          num_cfg;
+	struct cam_hw_fence_map_entry     fence_map_out[CAM_ISP_CTX_RES_MAX];
+	uint32_t                          num_fence_map_out;
+	struct cam_hw_fence_map_entry     fence_map_in[CAM_ISP_CTX_RES_MAX];
+	uint32_t                          num_fence_map_in;
+	uint32_t                          num_acked;
+	int32_t                           bubble_report;
+	struct  cam_isp_prepare_hw_update_data  hw_update_data;                          
 };
 
 /**
- * struct cam_isp_context_state_monitor - ISP context state
- *                                        monitoring for
- *                                        debug purposes
+ * struct cam_isp_context  - ISP context object
  *
- *@curr_state:          Current sub state that received req
- *@req_type:            Event type of incoming req
- *@req_id:              Request id
- *@evt_time_stamp       Current time stamp
- *
- */
-struct cam_isp_context_state_monitor {
-	enum cam_isp_ctx_activated_substate  curr_state;
-	enum cam_isp_state_change_trigger    trigger;
-	uint32_t                             req_id;
-	int64_t                              frame_id;
-	uint64_t                             evt_time_stamp;
-};
-
-/**
- * struct cam_isp_context   -  ISP context object
- *
- * @base:                      Common context object pointer
- * @frame_id:                  Frame id tracking for the isp context
- * @substate_actiavted:        Current substate for the activated state.
- * @process_bubble:            Atomic variable to check if ctx is still
- *                             processing bubble
- * @substate_machine:          ISP substate machine for external interface
- * @substate_machine_irq:      ISP substate machine for irq handling
- * @req_base:                  Common request object storage
- * @req_isp:                   ISP private request object storage
- * @hw_ctx:                    HW object returned by the acquire device command
- * @sof_timestamp_val:         Captured time stamp value at sof hw event
- * @boot_timestamp:            Boot time stamp for a given req_id
- * @active_req_cnt:            Counter for the active request
- * @reported_req_id:           Last reported request id
- * @subscribe_event:           The irq event mask that CRM subscribes to, IFE
- *                             will invoke CRM cb at those event.
- * @last_applied_req_id:       Last applied request id
- * @state_monitor_head:        Write index to the state monitoring array
- * @cam_isp_ctx_state_monitor: State monitoring array
- * @rdi_only_context:          Get context type information.
- *                             true, if context is rdi only context
- * @bubble_sof_count:          Atomic variable to check if ctx has any sof's
- *                             while processing bubble
+ * @base:                  Common context object pointer
+ * @frame_id:              Frame id tracking for the isp context
+ * @substate_actiavted:    Current substate for the activated state.
+ * @substate_machine:      ISP substate machine for external interface
+ * @substate_machine_irq:  ISP substate machine for irq handling
+ * @req_base:              Common request object storage
+ * @req_isp:               ISP private request object storage
+ * @hw_ctx:                HW object returned by the acquire device command
+ * @sof_timestamp_val:     Captured time stamp value at sof hw event
+ * @active_req_cnt:        Counter for the active request
+ * @reported_req_id:       Last reported request id
+ * @subscribe_event:       The irq event mask that CRM subscribes to, IFE will
+ *                         invoke CRM cb at those event.
+ * @last_applied_req_id:   Last applied request id
  *
  */
 struct cam_isp_context {
@@ -175,7 +123,6 @@ struct cam_isp_context {
 
 	int64_t                          frame_id;
 	uint32_t                         substate_activated;
-	atomic_t                         process_bubble;
 	struct cam_ctx_ops              *substate_machine;
 	struct cam_isp_ctx_irq_ops      *substate_machine_irq;
 
@@ -184,16 +131,13 @@ struct cam_isp_context {
 
 	void                            *hw_ctx;
 	uint64_t                         sof_timestamp_val;
-	uint64_t                         boot_timestamp;
 	int32_t                          active_req_cnt;
 	int64_t                          reported_req_id;
 	uint32_t                         subscribe_event;
 	int64_t                          last_applied_req_id;
-	atomic64_t                       state_monitor_head;
-	struct cam_isp_context_state_monitor cam_isp_ctx_state_monitor[
-		CAM_ISP_CTX_STATE_MONITOR_MAX_ENTRIES];
+	uint32_t                         frame_skip_count;
 	bool                             rdi_only_context;
-	atomic_t                         bubble_sof_count;
+	bool                             dual_ife_usage;
 };
 
 /**
@@ -223,5 +167,13 @@ int cam_isp_context_init(struct cam_isp_context *ctx,
  */
 int cam_isp_context_deinit(struct cam_isp_context *ctx);
 
+/**
+ * cam_isp_context_dump_active_request()
+ *
+ * @brief: 	Dump the info in the context
+ * @ctx: 	ISP context object to dump
+ *
+ */
+int cam_isp_context_dump_active_request(struct cam_isp_context *isp_ctx);
 
 #endif  /* __CAM_ISP_CONTEXT_H__ */

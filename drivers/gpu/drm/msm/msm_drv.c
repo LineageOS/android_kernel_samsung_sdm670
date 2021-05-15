@@ -57,6 +57,28 @@
 #define MSM_VERSION_MINOR	2
 #define MSM_VERSION_PATCHLEVEL	0
 
+static BLOCKING_NOTIFIER_HEAD(msm_drm_notifier_list);
+
+int msm_drm_register_notifier_client(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_register(&msm_drm_notifier_list, nb);
+}
+EXPORT_SYMBOL(msm_drm_register_notifier_client);
+
+int msm_drm_unregister_notifier_client(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_unregister(&msm_drm_notifier_list, nb);
+}
+EXPORT_SYMBOL(msm_drm_unregister_notifier_client);
+
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+int __msm_drm_notifier_call_chain(unsigned long event, void *data)
+{
+	return blocking_notifier_call_chain(&msm_drm_notifier_list,
+					event, data);
+}
+#endif
+
 static void msm_fb_output_poll_changed(struct drm_device *dev)
 {
 	struct msm_drm_private *priv = NULL;
@@ -466,6 +488,8 @@ static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 	int ret, i;
 	struct sched_param param;
 
+	pr_err("%s ++ \n", __func__);
+
 	ddev = drm_dev_alloc(drv, dev);
 	if (!ddev) {
 		dev_err(dev, "failed to allocate drm_device\n");
@@ -519,12 +543,16 @@ static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 
 	/* Bind all our sub-components: */
 	ret = msm_component_bind_all(dev, ddev);
-	if (ret)
+	if (ret){
+		pr_err("%s msm_component_bind_all fail\n", __func__);
 		goto bind_fail;
-
+	}
 	ret = msm_init_vram(ddev);
-	if (ret)
+	if (ret){
+		pr_err("%s msm_init_vram fail\n", __func__);
 		goto fail;
+	}
+	pr_err("%s get_mdp_ver(%d)\n", __func__, get_mdp_ver(pdev));
 
 	if (!dev->dma_parms) {
 		dev->dma_parms = devm_kzalloc(dev, sizeof(*dev->dma_parms),
@@ -733,6 +761,9 @@ static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 
 	drm_kms_helper_poll_init(ddev);
 
+	// KR_TODO
+	pr_err("%s -- \n", __func__);
+
 	return 0;
 
 fail:
@@ -750,6 +781,10 @@ mdss_init_fail:
 	kfree(priv);
 priv_alloc_fail:
 	drm_dev_unref(ddev);
+
+	// KR_TODO
+	pr_err("%s error -- \n", __func__);
+
 	return ret;
 }
 
@@ -1300,22 +1335,21 @@ static int msm_ioctl_register_event(struct drm_device *dev, void *data,
 		spin_lock_irqsave(&dev->event_lock, flag);
 		list_add_tail(&client->base.link, &priv->client_event_list);
 		spin_unlock_irqrestore(&dev->event_lock, flag);
-		return 0;
+ 		return 0;
 	}
-
-	ret = msm_register_event(dev, req_event, file, true);
-	if (ret) {
-		DRM_ERROR("failed to enable event %x object %x object id %d\n",
-			req_event->event, req_event->object_type,
+ 
+ 	ret = msm_register_event(dev, req_event, file, true);
+ 	if (ret) {
+ 		DRM_ERROR("failed to enable event %x object %x object id %d\n",
+ 			req_event->event, req_event->object_type,
 			req_event->object_id);
 		kfree(client);
 	} else {
 		/* Add current client to list */
-		spin_lock_irqsave(&dev->event_lock, flag);
+ 		spin_lock_irqsave(&dev->event_lock, flag);
 		list_add_tail(&client->base.link, &priv->client_event_list);
-		spin_unlock_irqrestore(&dev->event_lock, flag);
-	}
-
+ 		spin_unlock_irqrestore(&dev->event_lock, flag);
+ 	}
 	return ret;
 }
 
