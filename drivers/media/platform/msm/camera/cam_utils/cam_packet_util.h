@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,6 +14,9 @@
 #define _CAM_PACKET_UTIL_H_
 
 #include <uapi/media/cam_defs.h>
+
+//Maximum entries as part of patch logging buffer
+#define CAM_MAX_PATCH_INFO 100
 
 /**
  * @brief                  KMD scratch buffer information
@@ -31,6 +34,25 @@ struct cam_kmd_buf_info {
 	uint32_t   offset;
 	uint32_t   size;
 	uint32_t   used_bytes;
+};
+
+/**
+ * @brief                  Patch info for debugging
+ *
+ * @dst_buf_hdl:           dst_buffer handle
+ * @src_buf_hdl:           src_buffer handle
+ * @dst_cpu_addr:          dst_cpu address
+ * @src_buf_iova:          src_buf iova
+ * @src_buf_size:          src_buffer size
+ * @end_addr:              end_address
+ */
+struct cam_patch_info {
+	int32_t dst_buf_hdl;
+	int32_t src_buf_hdl;
+	uint32_t *dst_cpu_addr;
+	uint32_t *src_buf_iova;
+	size_t src_buf_size;
+	uint32_t end_addr;
 };
 
 /* Generic Cmd Buffer blob callback function type */
@@ -59,13 +81,10 @@ int cam_packet_util_get_cmd_mem_addr(int handle, uint32_t **buf_addr,
  *
  * @packet:                Packet to be validated
  *
- * @remain_len:            CPU buff length after config offset
- *
  * @return:                0 for success
  *                         -EINVAL for Fail
  */
-int cam_packet_util_validate_packet(struct cam_packet *packet,
-	size_t remain_len);
+int cam_packet_util_validate_packet(struct cam_packet *packet);
 
 /**
  * cam_packet_util_validate_cmd_desc()

@@ -21,6 +21,9 @@
 #include "sde_connector.h"
 #include "dsi_drm.h"
 #include "sde_trace.h"
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+#include "ss_dsi_panel_common.h"
+#endif
 
 #define to_dsi_bridge(x)     container_of((x), struct dsi_bridge, base)
 #define to_dsi_state(x)      container_of((x), struct dsi_connector_state, base)
@@ -141,6 +144,8 @@ static void dsi_bridge_pre_enable(struct drm_bridge *bridge)
 	int rc = 0;
 	struct dsi_bridge *c_bridge = to_dsi_bridge(bridge);
 
+	pr_err("%s ++\n", __func__);
+
 	if (!bridge) {
 		pr_err("Invalid params\n");
 		return;
@@ -192,6 +197,7 @@ static void dsi_bridge_pre_enable(struct drm_bridge *bridge)
 	if (rc)
 		pr_err("Continuous splash pipeline cleanup failed, rc=%d\n",
 									rc);
+	pr_err("%s --\n", __func__);
 }
 
 static void dsi_bridge_enable(struct drm_bridge *bridge)
@@ -367,8 +373,12 @@ static bool dsi_bridge_mode_fixup(struct drm_bridge *bridge,
 			(!(dsi_mode.dsi_mode_flags & DSI_MODE_FLAG_VRR)) &&
 			(!(dsi_mode.dsi_mode_flags & DSI_MODE_FLAG_DYN_CLK)) &&
 			(!crtc_state->active_changed ||
-			 display->is_cont_splash_enabled))
+			 display->is_cont_splash_enabled)){
 			dsi_mode.dsi_mode_flags |= DSI_MODE_FLAG_DMS;
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+			pr_info("DMS : switch mode %s -> %s\n", (&cur_mode)->name, adjusted_mode->name);
+#endif
+		}
 	}
 
 	/* convert back to drm mode, propagating the private info & flags */

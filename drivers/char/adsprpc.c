@@ -331,6 +331,8 @@ struct fastrpc_apps {
 	bool secure_flag;
 	spinlock_t ctxlock;
 	struct smq_invoke_ctx *ctxtable[FASTRPC_CTX_MAX];
+	int tx_counter;
+	int rx_counter;
 };
 
 struct fastrpc_mmap {
@@ -1328,6 +1330,7 @@ static void context_free(struct smq_invoke_ctx *ctx)
 	unsigned long irq_flags = 0;
 	void *handle = NULL;
 	const void *ptr = NULL;
+
 	spin_lock(&ctx->fl->hlock);
 	hlist_del_init(&ctx->hn);
 	spin_unlock(&ctx->fl->hlock);
@@ -1346,6 +1349,8 @@ static void context_free(struct smq_invoke_ctx *ctx)
 		if (me->ctxtable[i] == ctx) {
 			handle = me->ctxtable[i]->handle;
 			ptr = me->ctxtable[i]->ptr;
+			if(ctx->fl->cid == 0x2)
+				me->tx_counter++;
 			me->ctxtable[i] = NULL;
 			break;
 		}
@@ -1355,7 +1360,6 @@ static void context_free(struct smq_invoke_ctx *ctx)
 		glink_rx_done(handle, ptr, true);
 		handle = NULL;
 	}
-
 	kfree(ctx);
 }
 
@@ -2048,6 +2052,7 @@ static int fastrpc_internal_invoke(struct fastrpc_file *fl, uint32_t mode,
 	int err = 0, cid = -1, interrupted = 0;
 	struct timespec invoket = {0};
 	int64_t *perf_counter = NULL;
+	struct fastrpc_apps *me = &gfa;
 
 	cid = fl->cid;
 	VERIFY(err, cid >= ADSP_DOMAIN_ID && cid < NUM_CHANNELS);
@@ -2981,7 +2986,6 @@ static void fastrpc_glink_notify_rx(void *handle, const void *priv,
 	VERIFY(err, !IS_ERR_OR_NULL(me->ctxtable[index]));
 	if (err)
 		goto bail;
-
 	spin_lock_irqsave(&me->ctxlock, irq_flags);
 	VERIFY(err, ((me->ctxtable[index]->ctxid == (rsp->ctx & ~3)) &&
 		me->ctxtable[index]->magic == FASTRPC_CTX_MAGIC));
@@ -2989,6 +2993,8 @@ static void fastrpc_glink_notify_rx(void *handle, const void *priv,
 		spin_unlock_irqrestore(&me->ctxlock, irq_flags);
 		goto bail;
 	}
+	if( me->ctxtable[index]->fl->cid == 0x2)
+	me->rx_counter++;
 	me->ctxtable[index]->handle = handle;
 	me->ctxtable[index]->ptr = ptr;
 	spin_unlock_irqrestore(&me->ctxlock, irq_flags);
@@ -3267,6 +3273,8 @@ static ssize_t fastrpc_debugfs_read(struct file *filp, char __user *buffer,
 	char *fileinfo = NULL;
 	char single_line[UL_SIZE] = "----------------";
 	char title[UL_SIZE] = "=========================";
+	single_line[UL_SIZE-1]='\0';
+	title[UL_SIZE-1]='\0';
 
 	fileinfo = kzalloc(DEBUGFS_SIZE, GFP_KERNEL);
 	if (!fileinfo)
@@ -4494,6 +4502,8 @@ static int __init fastrpc_device_init(void)
 	me->dev = NULL;
 	me->glink = true;
 	me->secure_flag = false;
+	me->tx_counter = 0;
+	me->rx_counter = 0;
 	VERIFY(err, 0 == platform_driver_register(&fastrpc_driver));
 	if (err)
 		goto register_bail;

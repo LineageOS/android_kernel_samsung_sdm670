@@ -23,6 +23,9 @@
 #include <linux/memremap.h>
 #include <linux/highmem.h>
 #include <linux/slab.h>
+#ifdef CONFIG_UH_RKP
+#include <linux/rkp.h>
+#endif
 #include <linux/spinlock.h>
 #include <linux/vmalloc.h>
 #include <linux/sched.h>
@@ -198,9 +201,16 @@ pmd_t * __meminit vmemmap_pmd_populate(pud_t *pud, unsigned long addr, int node)
 
 pud_t * __meminit vmemmap_pud_populate(pgd_t *pgd, unsigned long addr, int node)
 {
+	void *p = NULL;
 	pud_t *pud = pud_offset(pgd, addr);
 	if (pud_none(*pud)) {
-		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
+#ifdef CONFIG_UH_RKP
+		p = rkp_ro_alloc();
+		if (!p)
+			p = vmemmap_alloc_block(PAGE_SIZE, node);
+#else
+		p = vmemmap_alloc_block(PAGE_SIZE, node);
+#endif
 		if (!p)
 			return NULL;
 		pud_populate(&init_mm, pud, p);
