@@ -601,6 +601,10 @@ int dsi_display_check_status(void *display, bool te_check_override);
  */
 int dsi_display_cmd_transfer(void *display, const char *cmd_buffer,
 		u32 cmd_buf_len);
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+void dsi_display_continuous_clk_ctrl(struct dsi_display *display,
+					     bool enable);
+#endif
 
 /**
  * dsi_display_soft_reset() - perform a soft reset on DSI controller
