@@ -908,7 +908,7 @@ int send_single(struct rpmh_client *rc, enum rpmh_state state, u32 addr,
  */
 int rpmh_flush(struct rpmh_client *rc)
 {
-	DEFINE_RPMH_MSG_ONSTACK(rc, 0, NULL, NULL, rpm_msg);
+        DEFINE_RPMH_MSG_ONSTACK(rc, 0, NULL, NULL, rpm_msg);
 	struct rpmh_req *p;
 	struct rpmh_mbox *rpm = rc->rpmh;
 	int ret;

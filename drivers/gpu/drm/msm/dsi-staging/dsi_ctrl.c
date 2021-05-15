@@ -30,12 +30,19 @@
 #include "dsi_clk.h"
 #include "dsi_pwr.h"
 #include "dsi_catalog.h"
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+#include "ss_dsi_panel_common.h"
+#endif
 
 #include "sde_dbg.h"
 
 #define DSI_CTRL_DEFAULT_LABEL "MDSS DSI CTRL"
 
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+#define DSI_CTRL_TX_TO_MS     1000
+#else
 #define DSI_CTRL_TX_TO_MS     200
+#endif
 
 #define TO_ON_OFF(x) ((x) ? "ON" : "OFF")
 
@@ -681,7 +688,7 @@ static int dsi_ctrl_supplies_init(struct platform_device *pdev,
 					  &ctrl->pwr_info.digital,
 					  "qcom,core-supply-entries");
 	if (rc)
-		pr_debug("failed to get digital supply, rc = %d\n", rc);
+		pr_err("failed to get digital supply, rc = %d\n", rc);
 
 	rc = dsi_pwr_get_dt_vreg_data(&pdev->dev,
 					  &ctrl->pwr_info.host_pwr,
@@ -802,6 +809,11 @@ static int dsi_ctrl_update_link_freqs(struct dsi_ctrl *dsi_ctrl,
 	    byte_clk_rate;
 	struct dsi_host_common_cfg *host_cfg = &config->common_config;
 	struct dsi_mode_info *timing = &config->video_timing;
+
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+		/* Change MIPI Clock with dsi timing(porch,fps) change */
+		/* ss_change_dyn_mipi_clk_timing(samsung_get_vdd()); */
+#endif
 
 	if (host_cfg->data_lanes & DSI_DATA_LANE_0)
 		num_of_lanes++;
@@ -1049,6 +1061,37 @@ int dsi_message_validate_tx_mode(struct dsi_ctrl *dsi_ctrl,
 	return rc;
 }
 
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+static void print_cmd_desc(const struct mipi_dsi_msg *msg)
+{
+	char buf[1024];
+	int len = 0;
+	size_t i;
+
+	/* Packet Info */
+	len += snprintf(buf, sizeof(buf) - len,  "%02x ", msg->type);
+	len += snprintf(buf + len, sizeof(buf) - len, "%02x ",
+		(msg->flags & MIPI_DSI_MSG_LASTCOMMAND) ? 1 : 0); /* Last bit */
+	len += snprintf(buf + len, sizeof(buf) - len, "%02x ", msg->channel);
+	len += snprintf(buf + len, sizeof(buf) - len, "%02x ",
+						(unsigned int)msg->flags);
+	len += snprintf(buf + len, sizeof(buf) - len, "%02x ", 0); /* Delay */
+	len += snprintf(buf + len, sizeof(buf) - len, "%02x ",
+						(unsigned int)msg->tx_len);
+
+	/* Packet Payload */
+	for (i = 0 ; i < msg->tx_len ; i++) {
+		len += snprintf(buf + len, sizeof(buf) - len,
+						"%02x ", msg->tx_buf[i]);
+		/* Break to prevent show too long command */
+		if (i > 250)
+			break;
+	}
+
+	LCD_INFO("(%02d) %s\n", (unsigned int)msg->tx_len, buf);
+}
+#endif
+
 static int dsi_message_tx(struct dsi_ctrl *dsi_ctrl,
 			  const struct mipi_dsi_msg *msg,
 			  u32 flags)
@@ -1063,6 +1106,12 @@ static int dsi_message_tx(struct dsi_ctrl *dsi_ctrl,
 	u32 cnt = 0, line_no = 0x1;
 	u8 *cmdbuf;
 	struct dsi_mode_info *timing;
+
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+	struct samsung_display_driver_data *vdd = ss_get_vdd(dsi_ctrl->cell_index);
+	if (vdd->debug_data->print_cmds)
+		print_cmd_desc(msg);
+#endif
 
 	/* Select the tx mode to transfer the command */
 	dsi_message_setup_tx_mode(dsi_ctrl, msg->tx_len, &flags);
@@ -1111,7 +1160,10 @@ static int dsi_message_tx(struct dsi_ctrl *dsi_ctrl,
 	}
 
 	if ((msg->flags & MIPI_DSI_MSG_LASTCOMMAND))
+	{
 		buffer[3] |= BIT(7);//set the last cmd bit in header.
+		pr_debug("MIPI_DSI_MSG_LASTCOMMAND is set\n");
+	}
 
 	if (flags & DSI_CTRL_CMD_FETCH_MEMORY) {
 		/* Embedded mode config is selected */
@@ -2272,6 +2324,12 @@ static void dsi_ctrl_handle_error_status(struct dsi_ctrl *dsi_ctrl,
 	/* enable back DSI interrupts */
 	if (dsi_ctrl->hw.ops.error_intr_ctrl)
 		dsi_ctrl->hw.ops.error_intr_ctrl(&dsi_ctrl->hw, true);
+
+#if defined(CONFIG_DISPLAY_SAMSUNG)
+	inc_dpui_u32_field_nolock(DPUI_KEY_QCT_DSIE, 1);
+	ss_get_vdd(dsi_ctrl->cell_index)->dsi_errors = error;
+#endif
+
 }
 
 /**
@@ -2584,10 +2642,12 @@ int dsi_ctrl_host_init(struct dsi_ctrl *dsi_ctrl, bool is_splash_enabled)
 		}
 	}
 
+	pr_debug("cont splash status:%d\n", is_splash_enabled);
+
 	dsi_ctrl->hw.ops.enable_status_interrupts(&dsi_ctrl->hw, 0x0);
 	dsi_ctrl->hw.ops.enable_error_interrupts(&dsi_ctrl->hw, 0xFF00E0);
 
-	pr_debug("[DSI_%d]Host initialization complete, continuous splash status:%d\n",
+	pr_err("[DSI_%d]Host initialization complete, continuous splash status:%d\n",
 		dsi_ctrl->cell_index, is_splash_enabled);
 	dsi_ctrl_update_state(dsi_ctrl, DSI_CTRL_OP_HOST_INIT, 0x1);
 error:
