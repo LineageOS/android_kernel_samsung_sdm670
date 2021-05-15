@@ -1,4 +1,5 @@
 source "drivers/video/fbdev/msm/msm_dba/Kconfig"
+source "drivers/video/fbdev/msm/samsung/Kconfig"
 
 if FB_MSM
 
