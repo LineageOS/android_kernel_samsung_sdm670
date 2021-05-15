@@ -31,6 +31,7 @@
 #include <linux/mm.h>
 #include <linux/fs.h>
 #include <linux/bio.h>
+#include <linux/sched.h>
 
 struct linux_binprm;
 struct cred;
