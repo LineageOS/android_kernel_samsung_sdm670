@@ -49,7 +49,7 @@ static const char f_midi_longname[] = "MIDI Gadget";
  * stored in 4-bit fields. And as the interface currently only holds one
  * single endpoint, this is the maximum number of ports we can allow.
  */
-#define MAX_PORTS 16
+#define MAX_PORTS 1
 
 /* MIDI message states */
 enum {
@@ -98,6 +98,7 @@ struct f_midi {
 	DECLARE_KFIFO_PTR(in_req_fifo, struct usb_request *);
 	spinlock_t transmit_lock;
 	unsigned int in_last_port;
+	unsigned char free_ref;
 
 	struct gmidi_in_port	in_ports_array[/* in_ports */];
 };
@@ -108,6 +109,7 @@ static inline struct f_midi *func_to_midi(struct usb_function *f)
 }
 
 static void f_midi_transmit(struct f_midi *midi);
+static void f_midi_rmidi_free(struct snd_rawmidi *rmidi);
 
 DECLARE_UAC_AC_HEADER_DESCRIPTOR(1);
 DECLARE_USB_MIDI_OUT_JACK_DESCRIPTOR(1);
@@ -348,7 +350,8 @@ static int f_midi_start_ep(struct f_midi *midi,
 	int err;
 	struct usb_composite_dev *cdev = f->config->cdev;
 
-	usb_ep_disable(ep);
+	if (ep->driver_data)
+		usb_ep_disable(ep);
 
 	err = config_ep_by_speed(midi->gadget, f, ep);
 	if (err) {
@@ -843,6 +846,8 @@ static int f_midi_register_card(struct f_midi *midi)
 			    SNDRV_RAWMIDI_INFO_INPUT |
 			    SNDRV_RAWMIDI_INFO_DUPLEX;
 	rmidi->private_data = midi;
+	rmidi->private_free = f_midi_rmidi_free;
+	midi->free_ref++;
 
 	/*
 	 * Yes, rawmidi OUTPUT = USB IN, and rawmidi INPUT = USB OUT.
@@ -1244,7 +1249,7 @@ static ssize_t alsa_show(struct device *dev,
 	struct usb_function_instance *fi_midi = dev_get_drvdata(dev);
 	struct f_midi *midi;
 
-	if (!fi_midi->f)
+	if (!fi_midi || !fi_midi->f)
 		dev_warn(dev, "f_midi: function not set\n");
 
 	if (fi_midi && fi_midi->f) {
@@ -1307,7 +1312,7 @@ static struct usb_function_instance *f_midi_alloc_inst(void)
 	opts->func_inst.free_func_inst = f_midi_free_inst;
 	opts->index = SNDRV_DEFAULT_IDX1;
 	opts->id = SNDRV_DEFAULT_STR1;
-	opts->buflen = 1024;
+	opts->buflen = 512;
 	opts->qlen = 32;
 	opts->in_ports = 1;
 	opts->out_ports = 1;
@@ -1330,13 +1335,20 @@ static void f_midi_free(struct usb_function *f)
 
 	midi = func_to_midi(f);
 	opts = container_of(f->fi, struct f_midi_opts, func_inst);
-	kfree(midi->id);
 	mutex_lock(&opts->lock);
-	kfifo_free(&midi->in_req_fifo);
-	kfree(midi);
-	opts->func_inst.f = NULL;
-	--opts->refcnt;
+	if (!--midi->free_ref) {
+		kfree(midi->id);
+		kfifo_free(&midi->in_req_fifo);
+		kfree(midi);
+		opts->func_inst.f = NULL;
+		--opts->refcnt;
+	}
 	mutex_unlock(&opts->lock);
+}
+
+static void f_midi_rmidi_free(struct snd_rawmidi *rmidi)
+{
+	f_midi_free(rmidi->private_data);
 }
 
 static void f_midi_unbind(struct usb_configuration *c, struct usb_function *f)
@@ -1397,6 +1409,7 @@ static struct usb_function *f_midi_alloc(struct usb_function_instance *fi)
 	midi->buflen = opts->buflen;
 	midi->qlen = opts->qlen;
 	midi->in_last_port = 0;
+	midi->free_ref = 1;
 
 	status = kfifo_alloc(&midi->in_req_fifo, midi->qlen, GFP_KERNEL);
 	if (status)

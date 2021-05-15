@@ -1270,6 +1270,8 @@ config KEYS_COMPAT
 
 endmenu
 
+source "arch/arm64/Kconfig.sec"
+
 menu "Power management options"
 
 source "kernel/power/Kconfig"
