@@ -709,6 +709,16 @@
 		KEEP(*(.initcall##level##.init))			\
 		KEEP(*(.initcall##level##s.init))			\
 
+#ifdef CONFIG_DEFERRED_INITCALLS
+#define DEFERRED_INITCALLS()					\
+		VMLINUX_SYMBOL(__deferred_initcall_start) = .;		\
+		KEEP(*(.deferred_initcall.init))		\
+		KEEP(*(.deferred_initcalls.init))		\
+		VMLINUX_SYMBOL(__deferred_initcall_end) = .;
+#else
+#define DEFERRED_INITCALLS()
+#endif
+
 #define INIT_CALLS							\
 		VMLINUX_SYMBOL(__initcall_start) = .;			\
 		KEEP(*(.initcallearly.init))				\
@@ -721,7 +731,8 @@
 		INIT_CALLS_LEVEL(rootfs)				\
 		INIT_CALLS_LEVEL(6)					\
 		INIT_CALLS_LEVEL(7)					\
-		VMLINUX_SYMBOL(__initcall_end) = .;
+		VMLINUX_SYMBOL(__initcall_end) = .;			\
+		DEFERRED_INITCALLS()
 
 #define CON_INITCALL							\
 		VMLINUX_SYMBOL(__con_initcall_start) = .;		\
