@@ -309,8 +309,6 @@ static int msm_dig_cdc_codec_config_compander(struct snd_soc_codec *codec,
 			dig_cdc->set_compander_mode(dig_cdc->handle, 0x08);
 		/* Enable Compander Clock */
 		snd_soc_update_bits(codec,
-			MSM89XX_CDC_CORE_COMP0_B2_CTL, 0x0F, 0x09);
-		snd_soc_update_bits(codec,
 			MSM89XX_CDC_CORE_CLK_RX_B2_CTL, 0x01, 0x01);
 		if (dig_cdc->comp_enabled[MSM89XX_RX1]) {
 			snd_soc_update_bits(codec,
@@ -331,7 +329,7 @@ static int msm_dig_cdc_codec_config_compander(struct snd_soc_codec *codec,
 		snd_soc_update_bits(codec,
 			MSM89XX_CDC_CORE_COMP0_B3_CTL, 0xFF, 0x28);
 		snd_soc_update_bits(codec,
-			MSM89XX_CDC_CORE_COMP0_B2_CTL, 0xF0, 0xB0);
+			MSM89XX_CDC_CORE_COMP0_B2_CTL, 0xF0, 0xF0);
 
 		/* Enable Compander GPIO */
 		if (dig_cdc->codec_hph_comp_gpio)
@@ -758,7 +756,7 @@ static int msm_dig_cdc_hw_params(struct snd_pcm_substream *substream,
 				 struct snd_pcm_hw_params *params,
 				 struct snd_soc_dai *dai)
 {
-	u8 tx_fs_rate, rx_fs_rate, rx_clk_fs_rate;
+	u8 tx_fs_rate, rx_fs_rate, rx_clk_fs_rate, rx_comp_peak;
 	int ret;
 
 	dev_dbg(dai->codec->dev,
@@ -771,32 +769,38 @@ static int msm_dig_cdc_hw_params(struct snd_pcm_substream *substream,
 		tx_fs_rate = 0x00;
 		rx_fs_rate = 0x00;
 		rx_clk_fs_rate = 0x00;
+		rx_comp_peak = 0x7;
 		break;
 	case 16000:
 		tx_fs_rate = 0x20;
 		rx_fs_rate = 0x20;
 		rx_clk_fs_rate = 0x01;
+		rx_comp_peak = 0x8;
 		break;
 	case 32000:
 		tx_fs_rate = 0x40;
 		rx_fs_rate = 0x40;
 		rx_clk_fs_rate = 0x02;
+		rx_comp_peak = 0x9;
 		break;
 	case 44100:
 	case 48000:
 		tx_fs_rate = 0x60;
 		rx_fs_rate = 0x60;
 		rx_clk_fs_rate = 0x03;
+		rx_comp_peak = 0xA;
 		break;
 	case 96000:
 		tx_fs_rate = 0x80;
 		rx_fs_rate = 0x80;
 		rx_clk_fs_rate = 0x04;
+		rx_comp_peak = 0xB;
 		break;
 	case 192000:
 		tx_fs_rate = 0xA0;
 		rx_fs_rate = 0xA0;
 		rx_clk_fs_rate = 0x05;
+		rx_comp_peak = 0xC;
 		break;
 	default:
 		dev_err(dai->codec->dev,
@@ -820,6 +824,8 @@ static int msm_dig_cdc_hw_params(struct snd_pcm_substream *substream,
 				ret);
 			return ret;
 		}
+		snd_soc_update_bits(dai->codec,
+			MSM89XX_CDC_CORE_COMP0_B2_CTL, 0x0F, rx_comp_peak);
 		break;
 	default:
 		dev_err(dai->codec->dev,

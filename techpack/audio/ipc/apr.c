@@ -1171,8 +1171,8 @@ static int apr_probe(struct platform_device *pdev)
 			      &modem_service_nb);
 
 	apr_tal_init();
-	apr_dev_ptr = &pdev->dev;
 	INIT_DELAYED_WORK(&add_chld_dev_work, apr_add_child_devices);
+	apr_dev_ptr = &pdev->dev;
 	return apr_debug_init();
 }
 

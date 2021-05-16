@@ -4579,7 +4579,7 @@ struct asm_softvolume_params {
 /* Right side direct channel. */
 #define PCM_CHANNEL_RSD  34
 
-#define PCM_MAX_CHMAP_ID PCM_CHANNEL_RRC
+#define PCM_MAX_CHMAP_ID PCM_CHANNEL_RSD
 
 #define PCM_FORMAT_MAX_NUM_CHANNEL  8
 

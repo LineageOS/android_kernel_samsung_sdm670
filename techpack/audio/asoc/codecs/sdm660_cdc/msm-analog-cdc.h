@@ -207,6 +207,9 @@ struct sdm660_cdc_priv {
 	struct on_demand_supply on_demand_list[ON_DEMAND_SUPPLIES_MAX];
 	struct regulator *spkdrv_reg;
 	struct blocking_notifier_head notifier_mbhc;
+#ifdef CONFIG_SAMSUNG_JACK
+	int micb_2_ref_cnt;
+#endif /* CONFIG_SAMSUNG_JACK */
 	/* mbhc module */
 	struct wcd_mbhc mbhc;
 	/* cal info for codec */
@@ -232,11 +235,15 @@ struct sdm660_cdc_pdata {
 };
 
 #if IS_ENABLED(CONFIG_SND_SOC_ANALOG_CDC)
+extern struct wcd_mbhc *msm_soc_get_mbhc(struct snd_soc_codec *codec);
 extern int msm_anlg_cdc_mclk_enable(struct snd_soc_codec *codec,
 				    int mclk_enable, bool dapm);
 extern int msm_anlg_cdc_hs_detect(struct snd_soc_codec *codec,
 		    struct wcd_mbhc_config *mbhc_cfg);
 extern void msm_anlg_cdc_hs_detect_exit(struct snd_soc_codec *codec);
+extern int msm_anlg_cdc_enable_standalone_micbias(struct snd_soc_codec *codec,
+						  int micb_num,
+						  bool enable);
 extern void msm_anlg_cdc_update_int_spk_boost(bool enable);
 extern void msm_anlg_cdc_spk_ext_pa_cb(
 		int (*codec_spk_ext_pa)(struct snd_soc_codec *codec,

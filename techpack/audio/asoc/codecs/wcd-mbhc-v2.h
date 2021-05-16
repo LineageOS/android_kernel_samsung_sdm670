@@ -141,7 +141,7 @@ do {                                                    \
 #define HS_DETECT_PLUG_TIME_MS (3 * 1000)
 #define SPECIAL_HS_DETECT_TIME_MS (2 * 1000)
 #define MBHC_BUTTON_PRESS_THRESHOLD_MIN 250
-#define GND_MIC_SWAP_THRESHOLD 4
+#define GND_MIC_SWAP_THRESHOLD 2
 #define GND_MIC_USBC_SWAP_THRESHOLD 2
 #define WCD_FAKE_REMOVAL_MIN_PERIOD_MS 100
 #define HS_VREF_MIN_VAL 1400
@@ -523,6 +523,13 @@ struct wcd_mbhc_fn {
 					  struct work_struct *work);
 };
 
+#ifdef CONFIG_SND_SOC_WCD_MBHC_EXT_ADC
+struct jack_zone {
+	unsigned int adc_high;
+	unsigned int jack_type;
+};
+#endif
+
 struct wcd_mbhc {
 	/* Delayed work to report long button press */
 	struct delayed_work mbhc_btn_dwork;
@@ -607,6 +614,16 @@ struct wcd_mbhc {
 
 	struct wcd_mbhc_fn *mbhc_fn;
 	bool force_linein;
+#ifdef CONFIG_SND_SOC_WCD_MBHC_USB_ANALOG
+	int sbu_oe_gpio;
+	int ear_sel_gpio;
+#endif
+#ifdef CONFIG_SND_SOC_WCD_MBHC_EXT_ADC
+	int debounce_time_ms;
+	uint32_t amux_channel;
+	struct qpnp_vadc_chip *earjack_vadc;
+	struct jack_zone jack_zones[4];
+#endif
 };
 
 void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,
