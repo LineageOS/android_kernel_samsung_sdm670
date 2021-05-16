@@ -804,6 +804,7 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
 						     ID_AA64PFR0_CSV3_SHIFT);
 }
 
+#ifndef CONFIG_UH_RKP
 static int __nocfi kpti_install_ng_mappings(void *__unused)
 {
 	typedef void (kpti_remap_fn)(int, int, phys_addr_t);
@@ -827,6 +828,7 @@ static int __nocfi kpti_install_ng_mappings(void *__unused)
 
 	return 0;
 }
+#endif
 
 static int __init parse_kpti(char *str)
 {
@@ -948,7 +950,12 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
 		.capability = ARM64_UNMAP_KERNEL_AT_EL0,
 		.def_scope = SCOPE_SYSTEM,
 		.matches = unmap_kernel_at_el0,
+#ifndef CONFIG_UH_RKP
+	/* kpti_install_ng_mappings adds nG bit for all ptes of kernel page table,
+	   which makes a collision with RKP.
+	   We makes all ptes having nG bit at its creation so we don't need this function */
 		.enable = kpti_install_ng_mappings,
+#endif
 	},
 #endif
 	{},
