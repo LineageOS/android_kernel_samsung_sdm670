@@ -32,6 +32,11 @@
 #include "wcd-mbhc-legacy.h"
 #include "wcd-mbhc-adc.h"
 #include "wcd-mbhc-v2-api.h"
+#ifdef CONFIG_SND_SOC_WCD_MBHC_EXT_ADC
+#include <linux/qpnp/qpnp-adc.h>
+#include <linux/qpnp/pin.h>
+#endif
+#include "../sdm660-common.h"
 
 void wcd_mbhc_jack_report(struct wcd_mbhc *mbhc,
 			  struct snd_soc_jack *jack, int status, int mask)
@@ -129,10 +134,22 @@ void wcd_enable_curr_micbias(const struct wcd_mbhc *mbhc,
 
 	switch (cs_mb_en) {
 	case WCD_MBHC_EN_CS:
-		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_MICB_CTRL, 0);
-		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_BTN_ISRC_CTL, 3);
-		/* Program Button threshold registers as per CS */
-		wcd_program_btn_threshold(mbhc, false);
+		if (mbhc->current_plug == MBHC_PLUG_TYPE_HEADSET) {
+			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_BTN_ISRC_CTL, 3);
+			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_FSM_EN, 1);
+			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_MICB_CTRL, 1);
+			/* Program Button threshold registers as per MICBIAS */
+			wcd_program_btn_threshold(mbhc, true);
+		} else if (mbhc->current_plug == MBHC_PLUG_TYPE_HEADPHONE) {
+			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_BTN_ISRC_CTL, 0);
+			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_FSM_EN, 1);
+			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_MICB_CTRL, 0);
+		} else {
+			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_MICB_CTRL, 0);
+			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_BTN_ISRC_CTL, 3);
+			/* Program Button threshold registers as per CS */
+			wcd_program_btn_threshold(mbhc, false);
+		}
 		break;
 	case WCD_MBHC_EN_MB:
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_BTN_ISRC_CTL, 0);
@@ -144,11 +161,17 @@ void wcd_enable_curr_micbias(const struct wcd_mbhc *mbhc,
 		wcd_program_btn_threshold(mbhc, true);
 		break;
 	case WCD_MBHC_EN_PULLUP:
-		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_BTN_ISRC_CTL, 3);
-		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_FSM_EN, 1);
-		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_MICB_CTRL, 1);
-		/* Program Button threshold registers as per MICBIAS */
-		wcd_program_btn_threshold(mbhc, true);
+		if (mbhc->current_plug == MBHC_PLUG_TYPE_HEADPHONE) {
+			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_BTN_ISRC_CTL, 0);
+			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_FSM_EN, 1);
+			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_MICB_CTRL, 0);
+		} else {
+			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_BTN_ISRC_CTL, 3);
+			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_FSM_EN, 1);
+			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_MICB_CTRL, 1);
+			/* Program Button threshold registers as per MICBIAS */
+			wcd_program_btn_threshold(mbhc, true);
+		}
 		break;
 	case WCD_MBHC_EN_NONE:
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_BTN_ISRC_CTL, 0);
@@ -554,6 +577,12 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 				enum snd_jack_types jack_type)
 {
 	struct snd_soc_codec *codec = mbhc->codec;
+#ifdef CONFIG_SND_SOC_WCD_MBHC_USB_ANALOG
+	struct snd_soc_card *card = codec->component.card;
+	struct msm_asoc_mach_data *pdata =
+				snd_soc_card_get_drvdata(card);
+#endif /* CONFIG_SND_SOC_WCD_MBHC_USB_ANALOG */
+
 	bool is_pa_on = false;
 	u8 fsm_en = 0;
 
@@ -601,6 +630,16 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 			 jack_type, mbhc->hph_status);
 		wcd_mbhc_jack_report(mbhc, &mbhc->headset_jack,
 				mbhc->hph_status, WCD_MBHC_JACK_MASK);
+#ifdef CONFIG_SND_SOC_WCD_MBHC_USB_ANALOG
+		if (mbhc->sbu_oe_gpio)
+			gpio_set_value(mbhc->sbu_oe_gpio, 1);
+		if (mbhc->ear_sel_gpio)
+			gpio_set_value(mbhc->ear_sel_gpio, 0);
+		if (pdata->gnd_sel_gpio)
+			gpio_set_value(pdata->gnd_sel_gpio, 0);
+
+		msm_cdc_pinctrl_select_sleep_state(pdata->us_euro_gpio_p);
+#endif
 		wcd_mbhc_set_and_turnoff_hph_padac(mbhc);
 		hphrocp_off_report(mbhc, SND_JACK_OC_HPHR);
 		hphlocp_off_report(mbhc, SND_JACK_OC_HPHL);
@@ -641,6 +680,16 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 				 __func__, mbhc->hph_status);
 			wcd_mbhc_jack_report(mbhc, &mbhc->headset_jack,
 					    0, WCD_MBHC_JACK_MASK);
+#ifdef CONFIG_SND_SOC_WCD_MBHC_USB_ANALOG
+			if (mbhc->sbu_oe_gpio)
+				gpio_set_value(mbhc->sbu_oe_gpio, 1);
+			if (mbhc->ear_sel_gpio)
+				gpio_set_value(mbhc->ear_sel_gpio, 0);
+			if (pdata->gnd_sel_gpio)
+				gpio_set_value(pdata->gnd_sel_gpio, 0);
+
+			msm_cdc_pinctrl_select_sleep_state(pdata->us_euro_gpio_p);
+#endif
 
 			if (mbhc->hph_status == SND_JACK_LINEOUT) {
 
@@ -774,6 +823,11 @@ void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,
 {
 	bool anc_mic_found = false;
 	enum snd_jack_types jack_type;
+#ifdef CONFIG_SND_SOC_WCD_MBHC_USB_ANALOG
+	struct snd_soc_codec *codec = mbhc->codec;
+	struct snd_soc_card *card = codec->component.card;
+	struct msm_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
+#endif
 
 	pr_debug("%s: enter current_plug(%d) new_plug(%d)\n",
 		 __func__, mbhc->current_plug, plug_type);
@@ -838,6 +892,16 @@ void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,
 	} else {
 		WARN(1, "Unexpected current plug_type %d, plug_type %d\n",
 		     mbhc->current_plug, plug_type);
+#ifdef CONFIG_SND_SOC_WCD_MBHC_USB_ANALOG
+		if (mbhc->sbu_oe_gpio)
+			gpio_set_value(mbhc->sbu_oe_gpio, 1);
+		if (mbhc->ear_sel_gpio)
+			gpio_set_value(mbhc->ear_sel_gpio, 0);
+		if (pdata->gnd_sel_gpio)
+			gpio_set_value(pdata->gnd_sel_gpio, 0);
+
+		msm_cdc_pinctrl_select_sleep_state(pdata->us_euro_gpio_p);
+#endif
 	}
 exit:
 	pr_debug("%s: leave\n", __func__);
@@ -939,8 +1003,6 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 			jack_type = SND_JACK_HEADSET;
 			break;
 		case MBHC_PLUG_TYPE_HIGH_HPH:
-			if (mbhc->mbhc_detection_logic == WCD_DETECTION_ADC)
-			    WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_ELECT_ISRC_EN, 0);
 			mbhc->is_extn_cable = false;
 			jack_type = SND_JACK_LINEOUT;
 			break;
@@ -1002,21 +1064,23 @@ int wcd_mbhc_get_button_mask(struct wcd_mbhc *mbhc)
 
 	switch (btn) {
 	case 0:
+	case 1:
 		mask = SND_JACK_BTN_0;
 		break;
-	case 1:
+	case 2:
 		mask = SND_JACK_BTN_1;
 		break;
-	case 2:
+	case 3:
 		mask = SND_JACK_BTN_2;
 		break;
-	case 3:
+	case 4:
 		mask = SND_JACK_BTN_3;
 		break;
-	case 4:
+	case 5:
 		mask = SND_JACK_BTN_4;
 		break;
-	case 5:
+	case 6:
+	case 7:
 		mask = SND_JACK_BTN_5;
 		break;
 	default:
@@ -1152,7 +1216,11 @@ static irqreturn_t wcd_mbhc_release_handler(int irq, void *data)
 	 */
 	if (mbhc->mbhc_detection_logic == WCD_DETECTION_LEGACY &&
 		mbhc->current_plug == MBHC_PLUG_TYPE_HEADPHONE) {
-		wcd_mbhc_find_plug_and_report(mbhc, MBHC_PLUG_TYPE_HEADSET);
+		/*
+		 * While insert headphone, and occurred btn interrupt,
+		 * dont make re-reporting to headset.
+		 */
+		/* wcd_mbhc_find_plug_and_report(mbhc, MBHC_PLUG_TYPE_HEADSET); */
 		goto exit;
 
 	}
@@ -1276,7 +1344,10 @@ static int wcd_mbhc_initialise(struct wcd_mbhc *mbhc)
 	WCD_MBHC_RSC_LOCK(mbhc);
 
 	/* enable HS detection */
-	if (mbhc->mbhc_cb->hph_pull_up_control)
+	if (mbhc->mbhc_cb->hph_pull_up_control_v2)
+		mbhc->mbhc_cb->hph_pull_up_control_v2(codec,
+						      HS_PULLUP_I_DEFAULT);
+	else if (mbhc->mbhc_cb->hph_pull_up_control)
 		mbhc->mbhc_cb->hph_pull_up_control(codec, I_DEFAULT);
 	else
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_HS_L_DET_PULL_UP_CTRL, 3);
@@ -1293,7 +1364,10 @@ static int wcd_mbhc_initialise(struct wcd_mbhc *mbhc)
 		mbhc->hphl_swh = 1;
 		mbhc->gnd_swh = 1;
 
-		if (mbhc->mbhc_cb->hph_pull_up_control)
+		if (mbhc->mbhc_cb->hph_pull_up_control_v2)
+			mbhc->mbhc_cb->hph_pull_up_control_v2(codec,
+							      HS_PULLUP_I_OFF);
+		else if (mbhc->mbhc_cb->hph_pull_up_control)
 			mbhc->mbhc_cb->hph_pull_up_control(codec, I_OFF);
 		else
 			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_HS_L_DET_PULL_UP_CTRL,
@@ -1847,6 +1921,10 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_codec *codec,
 	const char *gnd_switch = "qcom,msm-mbhc-gnd-swh";
 	const char *hs_thre = "qcom,msm-mbhc-hs-mic-max-threshold-mv";
 	const char *hph_thre = "qcom,msm-mbhc-hs-mic-min-threshold-mv";
+#ifdef CONFIG_SND_SOC_WCD_MBHC_EXT_ADC
+	struct of_phandle_args args;
+	int i = 0;
+#endif
 
 	pr_debug("%s: enter\n", __func__);
 
@@ -1890,13 +1968,82 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_codec *codec,
 		mbhc->moist_iref = hph_moist_config[1];
 		mbhc->moist_rref = hph_moist_config[2];
 	}
+#ifdef CONFIG_SND_SOC_WCD_MBHC_USB_ANALOG
+	mbhc->sbu_oe_gpio = of_get_named_gpio(card->dev->of_node,
+				"sbu-oe-gpio", 0);
+	if (mbhc->sbu_oe_gpio > 0) {
+		pr_info("%s: sbu_oe_gpio is enable\n", __func__);
+		ret = gpio_request(mbhc->sbu_oe_gpio, "sbu_oe_gpio");
+		if (ret < 0) {
+			pr_err("%s: failed to request sub_oe_gpio\n", __func__);
+			goto err;
+		}
+		gpio_direction_output(mbhc->sbu_oe_gpio, 1);
+	}
+
+	mbhc->ear_sel_gpio = of_get_named_gpio(card->dev->of_node,
+				"ear-sel-gpio", 0);
+	if (mbhc->ear_sel_gpio > 0) {
+		pr_info("%s: ear_sel_gpio is enable\n", __func__);
+		ret = gpio_request(mbhc->ear_sel_gpio, "ear_sel_gpio");
+		if (ret < 0) {
+			pr_err("%s: failed to request ear_sel_gpio\n", __func__);
+			goto err;
+		}
+		gpio_direction_output(mbhc->ear_sel_gpio, 0);
+	}
+#endif
+
+#ifdef CONFIG_SND_SOC_WCD_MBHC_EXT_ADC
+	ret = of_property_read_u32(card->dev->of_node,
+		"qcom,det_debounce_time_ms", &mbhc->debounce_time_ms);
+	if (ret) {
+		dev_err(card->dev,
+			"%s: missing debounce_time_ms in dt node\n",
+			__func__);
+		goto err;
+	}
+
+	ret = of_property_read_u32(card->dev->of_node,
+		"qcom,amux_channel", &mbhc->amux_channel);
+	if (ret < 0) {
+		dev_err(card->dev,
+			"%s: missing mpp-channel-scaling in dt node\n",
+			__func__);
+		goto err;
+	}
+	dev_dbg(card->dev, "mbhc: det_debounce_time_ms %d, amux_channel %d\n",
+		mbhc->debounce_time_ms, mbhc->amux_channel);
+
+	mbhc->earjack_vadc = qpnp_get_vadc(card->dev, "earjack-read");
+
+	for (i = 0; i < 4; i++) {
+		ret = of_parse_phandle_with_args(card->dev->of_node,
+			"det-zones-list", "#list-det-cells", i, &args);
+		if(ret < 0) {
+			dev_err(card->dev,
+				"%s: missing det-zones-list in dt node\n",
+				__func__);
+			goto err;
+		}
+
+		mbhc->jack_zones[i].adc_high = args.args[0];
+		mbhc->jack_zones[i].jack_type = args.args[1];
+		dev_dbg(card->dev, "det-zones-list %d, %d, %d\n",
+			args.args_count, args.args[0], args.args[1]);
+	}
+#ifdef CONFIG_SEC_FACTORY
+	mbhc->jack_zones[MBHC_PLUG_TYPE_HIGH_HPH].jack_type =
+		MBHC_PLUG_TYPE_HEADSET;
+#endif
+#endif
 
 	mbhc->in_swch_irq_handler = false;
 	mbhc->current_plug = MBHC_PLUG_TYPE_NONE;
 	mbhc->is_btn_press = false;
 	mbhc->codec = codec;
 	mbhc->intr_ids = mbhc_cdc_intr_ids;
-	mbhc->impedance_detect = impedance_det_en;
+	mbhc->impedance_detect = false;
 	mbhc->hphl_swh = hph_swh;
 	mbhc->gnd_swh = gnd_swh;
 	mbhc->micbias_enable = false;
