@@ -94,6 +94,14 @@
 #include <linux/secgpio_dvs.h>
 #endif
 
+#ifdef CONFIG_UH
+#include <linux/uh.h>
+#endif
+#ifdef CONFIG_UH_RKP
+#include <linux/rkp.h>
+#include <asm/fixmap.h>
+#endif
+
 #ifdef CONFIG_SECURITY_DEFEX
 #include <linux/defex.h>
 void __init __weak defex_load_rules(void) { }
@@ -109,6 +117,11 @@ extern void radix_tree_init(void);
 #ifdef CONFIG_KNOX_KAP
 int boot_mode_security;
 EXPORT_SYMBOL(boot_mode_security);
+#endif
+
+#ifdef CONFIG_UH_RKP
+int rkp_support_large_memory;
+EXPORT_SYMBOL(rkp_support_large_memory);
 #endif
 
 /*
@@ -458,6 +471,10 @@ static noinline void __ref rest_init(void)
 	cpu_startup_entry(CPUHP_ONLINE);
 }
 
+#ifdef CONFIG_RKP_KDP
+RKP_RO_AREA int is_recovery = 0;
+#endif
+
 /* Check for early params. */
 static int __init do_early_param(char *param, char *val,
 				 const char *unused, void *arg)
@@ -475,6 +492,14 @@ static int __init do_early_param(char *param, char *val,
 		}
 	}
 	/* We accept everything at this stage. */
+#ifdef CONFIG_RKP_KDP
+	if ((strncmp(param, "bootmode", 9) == 0)) {
+			//printk("\n RKP22 In Recovery Mode= %d\n",*val);
+			if ((strncmp(val, "2", 2) == 0)) {
+				is_recovery = 1;
+			}
+	}
+#endif
 	unset_memsize_reserved_name();
 	return 0;
 }
@@ -530,6 +555,87 @@ static void __init mm_init(void)
 	ioremap_huge_init();
 	kaiser_init();
 }
+#ifdef CONFIG_UH_RKP
+__attribute__((section(".rkp.bitmap"))) u8 rkp_pgt_bitmap_arr[RKP_PGT_BITMAP_LEN] = {0};
+__attribute__((section(".rkp.dblmap"))) u8 rkp_map_bitmap_arr[RKP_PGT_BITMAP_LEN] = {0};
+u8 rkp_started; /* 0 initialized by c standard */
+
+static void rkp_init(void)
+{
+	struct rkp_init init;
+
+	rkp_support_large_memory = 1;
+
+	init.magic = RKP_INIT_MAGIC;
+	init.vmalloc_start = VMALLOC_START;
+	init.vmalloc_end = (u64)high_memory;
+	init.init_mm_pgd = (u64)__pa(swapper_pg_dir);
+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+	init.tramp_pg_dir = (u64)__pa(tramp_pg_dir);
+#endif
+	init.id_map_pgd = (u64)__pa(idmap_pg_dir);
+	init.zero_pg_addr = __pa(empty_zero_page);
+	init.rkp_pgt_bitmap = (u64)__pa(rkp_pgt_bitmap);
+	init.rkp_dbl_bitmap = (u64)__pa(rkp_map_bitmap);
+	init.rkp_bitmap_size = RKP_PGT_BITMAP_LEN;
+	init.no_fimc_verify = 0;
+	init.fimc_phys_addr = 0;
+	init.zero_pg_addr = (u64)__pa(empty_zero_page);
+	init._text = (u64)_text;
+	init._etext = (u64)_etext;
+	//init.physmap_addr
+	init._srodata = (u64)__start_rodata;
+	init._erodata = (u64)__end_rodata;
+	init.large_memory = rkp_support_large_memory;
+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+	init.fix_tramp_valias = (u64)TRAMP_VALIAS;
+#endif
+	uh_call(UH_APP_RKP, RKP_START, (u64)&init, (u64)kimage_voffset, (u64)max_pfn, (u64)memstart_addr);
+	rkp_started = 1;
+}
+#endif
+
+#ifdef CONFIG_RKP_KDP
+#define VERITY_PARAM_LENGTH 20
+static char verifiedbootstate[VERITY_PARAM_LENGTH];
+static int __init verifiedboot_state_setup(char *str)
+{
+	strlcpy(verifiedbootstate, str, sizeof(verifiedbootstate));
+	return 1;
+}
+__setup("androidboot.verifiedbootstate=", verifiedboot_state_setup);
+
+void kdp_init(void)
+{
+	kdp_init_t cred;
+
+	cred.credSize 	= sizeof(struct cred);
+	cred.sp_size	= rkp_get_task_sec_size();
+	cred.pgd_mm 	= offsetof(struct mm_struct,pgd);
+	cred.uid_cred	= offsetof(struct cred,uid);
+	cred.euid_cred	= offsetof(struct cred,euid);
+	cred.gid_cred	= offsetof(struct cred,gid);
+	cred.egid_cred	= offsetof(struct cred,egid);
+
+	cred.bp_pgd_cred 	= offsetof(struct cred,bp_pgd);
+	cred.bp_task_cred 	= offsetof(struct cred,bp_task);
+	cred.type_cred 		= offsetof(struct cred,type);
+	cred.security_cred 	= offsetof(struct cred,security);
+	cred.usage_cred 	= offsetof(struct cred,use_cnt);
+
+	cred.cred_task  	= offsetof(struct task_struct,cred);
+	cred.mm_task 		= offsetof(struct task_struct,mm);
+	cred.pid_task		= offsetof(struct task_struct,pid);
+	cred.rp_task		= offsetof(struct task_struct,real_parent);
+	cred.comm_task 		= offsetof(struct task_struct,comm);
+
+	cred.bp_cred_secptr 	= rkp_get_offset_bp_cred();
+
+	cred.verifiedbootstate = (u64)verifiedbootstate;
+	uh_call(UH_APP_RKP, 0x40, (u64)&cred, 0, 0, 0);
+}
+#endif /*CONFIG_RKP_KDP*/
+
 
 asmlinkage __visible void __init start_kernel(void)
 {
@@ -617,6 +723,16 @@ asmlinkage __visible void __init start_kernel(void)
 	sort_main_extable();
 	trap_init();
 	mm_init();
+#ifdef CONFIG_UH_RKP
+	// UH_APP_INIT has to be moved to head.S before __enable_mmu, if we use TVM emulation.
+#ifndef CONFIG_UH_RKP_TVMEMUL
+	uh_call(UH_APP_INIT, 0, 0, 0, 0, 0);
+#endif
+	rkp_init();
+#ifdef CONFIG_RKP_KDP
+	rkp_cred_enable = 1;
+#endif /*CONFIG_RKP_KDP*/
+#endif
 
 	/*
 	 * Set up the scheduler prior starting any interrupts (such as the
@@ -718,6 +834,10 @@ asmlinkage __visible void __init start_kernel(void)
 	init_espfix_bsp();
 #endif
 	thread_stack_cache_init();
+#ifdef CONFIG_RKP_KDP
+	if (rkp_cred_enable) 
+		kdp_init();
+#endif /*CONFIG_RKP_KDP*/
 	cred_init();
 	fork_init();
 	proc_caches_init();
