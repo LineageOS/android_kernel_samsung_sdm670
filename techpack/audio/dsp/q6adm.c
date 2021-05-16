@@ -2657,8 +2657,7 @@ int adm_arrange_mch_ep2_map(struct adm_cmd_device_open_v6 *open_v6,
 
 static int adm_arrange_mch_map_v8(
 		struct adm_device_endpoint_payload *ep_payload,
-		int path,
-		int channel_mode)
+		int path, int channel_mode, int port_idx)
 {
 	int rc = 0, idx;
 
@@ -2677,7 +2676,13 @@ static int adm_arrange_mch_map_v8(
 	};
 
 	if ((ep_payload->dev_num_channel > 2) &&
-			multi_ch_maps[idx].set_channel_map) {
+		(port_channel_map[port_idx].set_channel_map ||
+		 multi_ch_maps[idx].set_channel_map)) {
+		if (port_channel_map[port_idx].set_channel_map)
+			memcpy(ep_payload->dev_channel_mapping,
+				port_channel_map[port_idx].channel_mapping,
+				PCM_FORMAT_MAX_NUM_CHANNEL_V8);
+		else
 		memcpy(ep_payload->dev_channel_mapping,
 			multi_ch_maps[idx].channel_mapping,
 			PCM_FORMAT_MAX_NUM_CHANNEL_V8);
@@ -3144,7 +3149,7 @@ int adm_open(int port_id, int path, int rate, int channel_mode, int topology,
 			ep1_payload.bit_width = bit_width;
 			ep1_payload.sample_rate  = rate;
 			ret = adm_arrange_mch_map_v8(&ep1_payload, path,
-					channel_mode);
+					channel_mode, port_idx);
 			if (ret)
 				return ret;
 
@@ -3726,6 +3731,7 @@ int adm_close(int port_id, int perf_mode, int copp_idx)
 
 	int ret = 0, port_idx;
 	int copp_id = RESET_COPP_ID;
+	int idx = ADM_MCH_MAP_IDX_PLAYBACK;
 
 	pr_debug("%s: port_id=0x%x perf_mode: %d copp_idx: %d\n", __func__,
 		 port_id, perf_mode, copp_idx);
@@ -3853,6 +3859,9 @@ int adm_close(int port_id, int perf_mode, int copp_idx)
 		pr_debug("%s: remove adm device from rtac\n", __func__);
 		rtac_remove_adm_device(port_id, copp_id);
 	}
+	if (afe_get_port_type(port_id) == MSM_AFE_PORT_TYPE_TX)
+		idx = ADM_MCH_MAP_IDX_REC;
+	multi_ch_maps[idx].set_channel_map = false;
 	return 0;
 }
 EXPORT_SYMBOL(adm_close);
