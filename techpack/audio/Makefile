@@ -4,8 +4,13 @@ include $(srctree)/techpack/audio/config/sdm845auto.conf
 export $(shell sed 's/=.*//' $(srctree)/techpack/audio/config/sdm845auto.conf)
 endif
 ifeq ($(CONFIG_ARCH_SDM670), y)
+ifeq ($(CONFIG_SEC_GTS4LV_PROJECT), y)
+include $(srctree)/techpack/audio/config/sdm710auto_gts4lv.conf
+export $(shell sed 's/=.*//' $(srctree)/techpack/audio/config/sdm710auto_gts4lv.conf)
+else
 include $(srctree)/techpack/audio/config/sdm710auto_static.conf
 export $(shell sed 's/=.*//' $(srctree)/techpack/audio/config/sdm710auto_static.conf)
+endif
 endif
 ifeq ($(CONFIG_ARCH_SDXPOORWILLS), y)
 include $(srctree)/techpack/audio/config/sdxpoorwillsauto.conf
@@ -27,15 +32,20 @@ LINUXINCLUDE    += \
                 -include $(srctree)/techpack/audio/config/sdm845autoconf.h
 endif
 ifeq ($(CONFIG_ARCH_SDM670), y)
+ifeq ($(CONFIG_SEC_GTS4LV_PROJECT), y)
+LINUXINCLUDE    += \
+                -include $(srctree)/techpack/audio/config/sdm710autoconf_gts4lv.h
+else
 LINUXINCLUDE    += \
                 -include $(srctree)/techpack/audio/config/sdm710autoconf.h
+endif
 endif
 ifeq ($(CONFIG_ARCH_SDXPOORWILLS), y)
 LINUXINCLUDE    += \
                 -include $(srctree)/techpack/audio/config/sdxpoorwillsautoconf.h
 endif
 
-obj-y += asoc/
+obj-y += soc/
 obj-y += dsp/
 obj-y += ipc/
-obj-y += soc/
+obj-y += asoc/
