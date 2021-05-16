@@ -25,9 +25,19 @@
 #include "codecs/msm-cdc-pinctrl.h"
 #include "codecs/sdm660_cdc/msm-analog-cdc.h"
 #include "codecs/wsa881x.h"
+#ifdef CONFIG_SND_SOC_CS35L41
+#include <linux/mfd/cs35l41/registers.h>
+#include <linux/mfd/cs35l41/big_data.h>
+#endif
 
 #define __CHIPSET__ "SDM660 "
 #define MSM_DAILINK_NAME(name) (__CHIPSET__#name)
+
+#ifdef CONFIG_SAMSUNG_JACK
+#include <linux/sec_jack.h>
+#include <linux/qpnp/qpnp-adc.h>
+#include <linux/qpnp/pin.h>
+#endif /* CONFIG_SAMSUNG_JACK */
 
 #define DRV_NAME "sdm660-asoc-snd"
 
@@ -37,6 +47,86 @@
 #define DEV_NAME_STR_LEN  32
 #define DEFAULT_MCLK_RATE 9600000
 #define MSM_LL_QOS_VALUE 300 /* time in us to ensure LPM doesn't go in C3/C4 */
+
+#ifdef CONFIG_SND_SOC_CS35L41
+#ifdef CONFIG_SND_SOC_CS35L41_2SPK
+#define NUM_AMPS 2
+#else
+#define NUM_AMPS 4
+#endif
+
+static struct snd_soc_codec_conf cs35l41_conf[] = {
+#ifdef CONFIG_SND_SOC_CS35L41_2SPK
+	{
+		.dev_name = "cs35l41-codec.0.auto",
+		.name_prefix = "Right",
+	},
+	{
+		.dev_name = "cs35l41-codec.4.auto",
+		.name_prefix = "Left",
+	}
+#else
+	{
+		.dev_name = "cs35l41-codec.0.auto",
+		.name_prefix = "RR",
+	},
+	{
+		.dev_name = "cs35l41-codec.4.auto",
+		.name_prefix = "RL",
+	},
+	{
+		.dev_name = "cs35l41-codec.8.auto",
+		.name_prefix = "FR",
+	},
+	{
+		.dev_name = "cs35l41-codec.12.auto",
+		.name_prefix = "FL",
+	}
+#endif
+};
+
+#define CLK_SRC_SCLK 0
+#define CLK_SRC_LRCLK 1
+#define CLK_SRC_PDM 2
+#define CLK_SRC_SELF 3
+#define CLK_SRC_MCLK 4
+#define CLK_SRC_SWIRE 5
+#define CLK_SRC_DAI 0
+#define CLK_SRC_CODEC 1
+
+static struct snd_soc_codec_conf cs35l41_conf[NUM_AMPS];
+
+/*
+ * We want to configure these at runtime for testing
+ */
+static unsigned int codec_clk_src = CLK_SRC_SCLK;
+static const char *const codec_src_clocks[] = {"SCLK", "LRCLK", "PDM",
+						"MCLK", "SELF", "SWIRE"};
+
+static unsigned int dai_clks = SND_SOC_DAIFMT_CBS_CFS;
+static const char *const dai_sub_clocks[] = {"Codec Slave", "Codec Master",
+					"CODEC BMFS", "CODEC BSFM"
+};
+
+static unsigned int dai_bit_fmt = SND_SOC_DAIFMT_NB_NF;
+static const char *const dai_bit_config[] = {"NormalBF", "NormalB INVF",
+					"INVB NormalF", "INVB INVF"
+};
+
+static unsigned int dai_mode_fmt = SND_SOC_DAIFMT_I2S;
+static const char *const dai_mode_config[] = {"I2S", "Right J",
+					"Left J", "DSP A", "DSP B",
+					"PDM"
+};
+
+static unsigned int sys_clk_static;
+static const char *const static_clk_mode[] = {"Off", "5P6", "6P1", "11P2",
+			"12", "12P2", "13", "22P5", "24", "24P5", "26"
+};
+
+unsigned int dai_force_frame32;
+static const char *const dai_force_frame32_config[] = {"Off", "On"};
+#endif
 
 enum {
 	DP_RX_IDX,
@@ -249,9 +339,9 @@ static bool msm_swap_gnd_mic(struct snd_soc_codec *codec, bool active);
 static struct wcd_mbhc_config mbhc_cfg = {
 	.read_fw_bin = false,
 	.calibration = NULL,
-	.detect_extn_cable = true,
+	.detect_extn_cable = false,
 	.mono_stero_detection = false,
-	.swap_gnd_mic = NULL,
+	.swap_gnd_mic = msm_swap_gnd_mic,
 	.hs_ext_micbias = true,
 	.key_code[0] = KEY_MEDIA,
 	.key_code[1] = KEY_VOICECOMMAND,
@@ -267,6 +357,11 @@ static struct wcd_mbhc_config mbhc_cfg = {
 	.anc_micbias = 0,
 	.enable_anc_mic_detect = false,
 };
+
+#ifdef CONFIG_SAMSUNG_JACK
+static struct snd_soc_jack hs_jack;
+static struct mutex jack_mutex;
+#endif /* CONFIG_SAMSUNG_JACK */
 
 static struct dev_config proxy_rx_cfg = {
 	.sample_rate = SAMPLING_RATE_48KHZ,
@@ -495,6 +590,352 @@ static struct afe_clk_set mi2s_mclk[MI2S_MAX] = {
 
 static struct mi2s_conf mi2s_intf_conf[MI2S_MAX];
 
+#ifdef CONFIG_SND_SOC_CS35L41
+static int codec_clk_src_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	int codec_clk_src_val = 0;
+
+	switch (codec_clk_src) {
+	case CLK_SRC_SCLK:
+		codec_clk_src_val = 0;
+		break;
+	case CLK_SRC_LRCLK:
+		codec_clk_src_val = 1;
+		break;
+	case CLK_SRC_PDM:
+		codec_clk_src_val = 2;
+		break;
+	case CLK_SRC_MCLK:
+		codec_clk_src_val = 3;
+		break;
+	case CLK_SRC_SELF:
+		codec_clk_src_val = 4;
+		break;
+	case CLK_SRC_SWIRE:
+		codec_clk_src_val = 5;
+		break;
+	}
+
+	ucontrol->value.integer.value[0] = codec_clk_src_val;
+
+	return 0;
+}
+
+static int codec_clk_src_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	pr_info("%s: ucontrol value = %ld\n", __func__,
+			ucontrol->value.integer.value[0]);
+
+	switch (ucontrol->value.integer.value[0]) {
+	case 0:
+		codec_clk_src = CLK_SRC_SCLK;
+		break;
+	case 1:
+		codec_clk_src = CLK_SRC_LRCLK;
+		break;
+	case 2:
+		codec_clk_src = CLK_SRC_PDM;
+		break;
+	case 3:
+		codec_clk_src = CLK_SRC_MCLK;
+		break;
+	case 4:
+		codec_clk_src = CLK_SRC_SELF;
+		break;
+	case 5:
+		codec_clk_src = CLK_SRC_SWIRE;
+		break;
+	}
+
+	return 0;
+}
+
+static int dai_clks_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	int dai_clks_val = 0;
+
+	switch (dai_clks) {
+	case SND_SOC_DAIFMT_CBS_CFS:
+		dai_clks_val = 0;
+		break;
+	case SND_SOC_DAIFMT_CBM_CFM:
+		dai_clks_val = 1;
+		break;
+	case SND_SOC_DAIFMT_CBM_CFS:
+		dai_clks_val = 2;
+		break;
+	case SND_SOC_DAIFMT_CBS_CFM:
+		dai_clks_val = 3;
+		break;
+	}
+
+	ucontrol->value.integer.value[0] = dai_clks_val;
+
+	return 0;
+}
+
+static int dai_clks_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	pr_info("%s: ucontrol value = %ld\n", __func__,
+			ucontrol->value.integer.value[0]);
+
+	switch (ucontrol->value.integer.value[0]) {
+	case 0:
+		dai_clks = SND_SOC_DAIFMT_CBS_CFS;
+		break;
+	case 1:
+		dai_clks = SND_SOC_DAIFMT_CBM_CFM;
+		break;
+	case 2:
+		dai_clks = SND_SOC_DAIFMT_CBM_CFS;
+		break;
+	case 3:
+		dai_clks = SND_SOC_DAIFMT_CBS_CFM;
+		break;
+	}
+
+	return 0;
+}
+
+static int dai_bitfmt_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	int dai_bits_val = 0;
+
+	switch (dai_bit_fmt) {
+	case SND_SOC_DAIFMT_NB_NF:
+		dai_bits_val = 0;
+		break;
+	case SND_SOC_DAIFMT_NB_IF:
+		dai_bits_val = 1;
+		break;
+	case SND_SOC_DAIFMT_IB_NF:
+		dai_bits_val = 2;
+		break;
+	case SND_SOC_DAIFMT_IB_IF:
+		dai_bits_val = 3;
+		break;
+	}
+
+	ucontrol->value.integer.value[0] = dai_bits_val;
+
+	return 0;
+}
+
+static int dai_bitfmt_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	pr_info("%s: ucontrol value = %ld\n", __func__,
+			ucontrol->value.integer.value[0]);
+
+	switch (ucontrol->value.integer.value[0]) {
+	case 0:
+		dai_bit_fmt = SND_SOC_DAIFMT_NB_NF;
+		break;
+	case 1:
+		dai_bit_fmt = SND_SOC_DAIFMT_NB_IF;
+		break;
+	case 2:
+		dai_bit_fmt = SND_SOC_DAIFMT_IB_NF;
+		break;
+	case 3:
+		dai_bit_fmt = SND_SOC_DAIFMT_IB_IF;
+		break;
+	}
+
+	return 0;
+}
+
+static int dai_mode_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	int dai_mode_val = 0;
+
+	switch (dai_mode_fmt) {
+	case SND_SOC_DAIFMT_I2S:
+		dai_mode_val = 0;
+		break;
+	case SND_SOC_DAIFMT_RIGHT_J:
+		dai_mode_val = 1;
+		break;
+	case SND_SOC_DAIFMT_LEFT_J:
+		dai_mode_val = 2;
+		break;
+	case SND_SOC_DAIFMT_DSP_A:
+		dai_mode_val = 3;
+		break;
+	case SND_SOC_DAIFMT_DSP_B:
+		dai_mode_val = 4;
+		break;
+	case SND_SOC_DAIFMT_PDM:
+		dai_mode_val = 5;
+		break;
+	}
+
+	ucontrol->value.integer.value[0] = dai_mode_val;
+
+	return 0;
+}
+
+static int dai_mode_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	pr_info("%s: ucontrol value = %ld\n", __func__,
+			ucontrol->value.integer.value[0]);
+
+	switch (ucontrol->value.integer.value[0]) {
+	case 0:
+		dai_mode_fmt = SND_SOC_DAIFMT_I2S;
+		break;
+	case 1:
+		dai_mode_fmt = SND_SOC_DAIFMT_RIGHT_J;
+		break;
+	case 2:
+		dai_mode_fmt = SND_SOC_DAIFMT_LEFT_J;
+		break;
+	case 3:
+		dai_mode_fmt = SND_SOC_DAIFMT_DSP_A;
+		break;
+	case 4:
+		dai_mode_fmt = SND_SOC_DAIFMT_DSP_B;
+		break;
+	case 5:
+		dai_mode_fmt = SND_SOC_DAIFMT_PDM;
+		break;
+	}
+
+	return 0;
+}
+
+static int static_clk_mode_get(struct snd_kcontrol *kcontrol,
+			       struct snd_ctl_elem_value *ucontrol)
+{
+	int static_mode_val = 0;
+
+	switch (sys_clk_static) {
+	case 0:
+		static_mode_val = 0;
+		break;
+	case 5644800:
+		static_mode_val = 1;
+		break;
+	case 6144000:
+		static_mode_val = 2;
+		break;
+	case 11289600:
+		static_mode_val = 3;
+		break;
+	case 12000000:
+		static_mode_val = 4;
+		break;
+	case 12288000:
+		static_mode_val = 5;
+		break;
+	case 13000000:
+		static_mode_val = 6;
+		break;
+	case 22579200:
+		static_mode_val = 7;
+		break;
+	case 24000000:
+		static_mode_val = 8;
+		break;
+	case 24576000:
+		static_mode_val = 9;
+		break;
+	case 26000000:
+		static_mode_val = 10;
+		break;
+	}
+
+	ucontrol->value.integer.value[0] = static_mode_val;
+
+	return 0;
+}
+
+static int static_clk_mode_put(struct snd_kcontrol *kcontrol,
+			       struct snd_ctl_elem_value *ucontrol)
+{
+
+	switch (ucontrol->value.integer.value[0]) {
+	case 0:
+		sys_clk_static = 0;
+		break;
+	case 1:
+		sys_clk_static = 5644800;
+		break;
+	case 2:
+		sys_clk_static = 6144000;
+		break;
+	case 3:
+		sys_clk_static = 11289600;
+		break;
+	case 4:
+		sys_clk_static = 12000000;
+		break;
+	case 5:
+		sys_clk_static = 12288000;
+		break;
+	case 6:
+		sys_clk_static = 13000000;
+		break;
+	case 7:
+		sys_clk_static = 22579200;
+		break;
+	case 8:
+		sys_clk_static = 24000000;
+		break;
+	case 9:
+		sys_clk_static = 24576000;
+		break;
+	case 10:
+		sys_clk_static = 26000000;
+		break;
+	}
+
+	return 0;
+}
+
+static int dai_force_frame32_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	int dai_force_frame32_val = 0;
+
+	switch (dai_force_frame32) {
+	case 0:
+		dai_force_frame32_val = 0;
+		break;
+	case 1:
+		dai_force_frame32_val = 1;
+		break;
+	}
+
+	ucontrol->value.integer.value[0] = dai_force_frame32_val;
+
+	return 0;
+}
+
+static int dai_force_frame32_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+
+	switch (ucontrol->value.integer.value[0]) {
+	case 0:
+		dai_force_frame32 = 0;
+		break;
+	case 1:
+		dai_force_frame32 = 1;
+		break;
+	}
+
+	return 0;
+}
+#endif
+
 /* TDM default slot config */
 struct tdm_slot_cfg {
 	u32 width;
@@ -528,8 +969,7 @@ static unsigned int tdm_rx_slot_offset
 		{0xFFFF}, /* not used */
 	},
 	{/* SEC TDM */
-		{0, 4, 8, 12, 16, 20, 24, 28,
-			32, 36, 40, 44, 48, 52, 56, 60, 0xFFFF},
+		{0, 4, 8, 12, 0xFFFF},
 		{0xFFFF}, /* not used */
 		{0xFFFF}, /* not used */
 		{0xFFFF}, /* not used */
@@ -585,8 +1025,7 @@ static unsigned int tdm_tx_slot_offset
 		{0xFFFF}, /* not used */
 	},
 	{/* SEC TDM */
-		{0, 4, 8, 12, 16, 20, 24, 28,
-			32, 36, 40, 44, 48, 52, 56, 60, 0xFFFF},
+		{0, 4, 8, 12, 0xFFFF},
 		{0xFFFF}, /* not used */
 		{0xFFFF}, /* not used */
 		{0xFFFF}, /* not used */
@@ -724,6 +1163,10 @@ int msm_tdm_snd_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+#ifdef CONFIG_SND_SOC_CS35L41
+	struct snd_soc_dai **codec_dais = rtd->codec_dais;
+	unsigned int num_codecs = rtd->num_codecs;
+#endif
 	int ret = 0;
 	int channels, slot_width, slots, rate, format, tdm_interface;
 	unsigned int slot_mask;
@@ -1322,13 +1765,26 @@ int msm_tdm_snd_hw_params(struct snd_pcm_substream *substream,
 		goto end;
 	}
 
+#ifdef CONFIG_SND_SOC_CS35L41
 	rate = params_rate(params);
 	clk_freq = rate * slot_width * slots;
+	pr_info("%s: rate:%d slot_width:%d slot:%d\n", __func__, rate, slot_width, slots);
 	ret = snd_soc_dai_set_sysclk(cpu_dai, 0, clk_freq, SND_SOC_CLOCK_OUT);
-	if (ret < 0) {
+	if (ret < 0)
 		pr_err("%s: failed to set tdm clk, err:%d\n",
 			__func__, ret);
+
+	for (i = 0; i < num_codecs; i++) {
+		ret = snd_soc_dai_set_sysclk(codec_dais[i], 0,
+				clk_freq, SND_SOC_CLOCK_IN);
+		if (ret < 0)
+			pr_err("%s: failed to set codec tdm clk, err:%d\n",
+						__func__, ret);
+
+		ret = snd_soc_codec_set_sysclk(codec_dais[i]->codec,
+				CLK_SRC_SCLK, 0, clk_freq, SND_SOC_CLOCK_IN);
 	}
+#endif
 
 end:
 	return ret;
@@ -3146,6 +3602,17 @@ static int msm_qos_ctl_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+#ifdef CONFIG_SND_SOC_CS35L41
+static const struct soc_enum cirrus_snd_enum[] = {
+	SOC_ENUM_SINGLE_EXT(4, dai_sub_clocks),
+	SOC_ENUM_SINGLE_EXT(4, dai_bit_config),
+	SOC_ENUM_SINGLE_EXT(6, dai_mode_config),
+	SOC_ENUM_SINGLE_EXT(11, static_clk_mode),
+	SOC_ENUM_SINGLE_EXT(5, codec_src_clocks),
+	SOC_ENUM_SINGLE_EXT(2, dai_force_frame32_config),
+};
+#endif
+
 const struct snd_kcontrol_new msm_common_snd_controls[] = {
 	SOC_ENUM_EXT("PROXY_RX Channels", proxy_rx_chs,
 			proxy_rx_ch_get, proxy_rx_ch_put),
@@ -3686,6 +4153,20 @@ const struct snd_kcontrol_new msm_common_snd_controls[] = {
 		tdm_tx_slot_mapping_get, tdm_tx_slot_mapping_put),
 	SOC_ENUM_EXT("MultiMedia5_RX QOS Vote", qos_vote, msm_qos_ctl_get,
 			msm_qos_ctl_put),
+#ifdef CONFIG_SND_SOC_CS35L41
+	SOC_ENUM_EXT("DAI Clocks", cirrus_snd_enum[0], dai_clks_get,
+			dai_clks_put),
+	SOC_ENUM_EXT("DAI Polarity", cirrus_snd_enum[1], dai_bitfmt_get,
+			dai_bitfmt_put),
+	SOC_ENUM_EXT("DAI Mode", cirrus_snd_enum[2], dai_mode_get,
+			dai_mode_put),
+	SOC_ENUM_EXT("Static MCLK Mode", cirrus_snd_enum[3],
+			static_clk_mode_get, static_clk_mode_put),
+	SOC_ENUM_EXT("Codec CLK Source", cirrus_snd_enum[4], codec_clk_src_get,
+			codec_clk_src_put),
+	SOC_ENUM_EXT("Force Frame32", cirrus_snd_enum[5], dai_force_frame32_get,
+			dai_force_frame32_put),
+#endif
 };
 
 /**
@@ -5234,9 +5715,14 @@ static bool msm_swap_gnd_mic(struct snd_soc_codec *codec, bool active)
 			if (value)
 				msm_cdc_pinctrl_select_sleep_state(
 							pdata->us_euro_gpio_p);
-			else
+			else {
 				msm_cdc_pinctrl_select_active_state(
 							pdata->us_euro_gpio_p);
+#ifdef CONFIG_SND_SOC_WCD_MBHC_USB_ANALOG
+				if (pdata->gnd_sel_gpio)
+					gpio_set_value(pdata->gnd_sel_gpio, 0);
+#endif /* CONFIG_SND_SOC_WCD_MBHC_USB_ANALOG */
+			}
 		} else if (pdata->us_euro_gpio >= 0) {
 			value = gpio_get_value_cansleep(pdata->us_euro_gpio);
 			gpio_set_value_cansleep(pdata->us_euro_gpio, !value);
@@ -5381,6 +5867,92 @@ codec_dai:
 err:
 	return ret;
 }
+
+#ifdef CONFIG_SAMSUNG_JACK
+void msm_set_micbias(bool state)
+{
+	struct snd_soc_jack *jack = &hs_jack;
+	struct snd_soc_card *card;
+	struct snd_soc_dapm_context *dapm;
+	char *str = "MIC BIAS Power External2";
+	int ret = 0;
+
+	if (jack->card == NULL) {
+		pr_err("%s card is NULL\n", __func__);
+		return;
+	}
+	pr_info("%s : %s, state=%d\n", __func__, str, state);
+
+	mutex_lock(&jack_mutex);
+	card = jack->card;
+	dapm = &card->dapm;
+
+	if (state == true)
+		ret = snd_soc_dapm_force_enable_pin(dapm, str);
+	else
+		ret = snd_soc_dapm_disable_pin(dapm, str);
+
+	if(ret < 0) {
+		pr_err("%s is failed(%d)\n",
+			__func__, ret);
+	}
+
+	snd_soc_dapm_sync(dapm);
+	mutex_unlock(&jack_mutex);
+}
+
+static int msm_get_adc(void)
+{
+	struct snd_soc_jack *jack = &hs_jack;
+	struct snd_soc_card *card;
+	struct msm_asoc_mach_data *pdata;
+	struct qpnp_vadc_result result;
+	struct qpnp_vadc_chip *earjack_vadc;
+	int adc;
+
+	if (jack->card == NULL) {
+		pr_err("%s card is NULL\n", __func__);
+		return -1;
+	}
+
+	card = jack->card;
+	pdata = snd_soc_card_get_drvdata(card);
+	earjack_vadc = qpnp_get_vadc(card->dev,
+		"earjack-read");
+	qpnp_vadc_read(earjack_vadc, pdata->amux_channel, &result);
+
+	/* Get voltage in microvolts */
+	adc = ((int)result.physical)/1000;
+
+	return adc;
+}
+
+static int msm_get_moisture_adc(void)
+{
+	struct snd_soc_jack *jack = &hs_jack;
+	struct snd_soc_card *card;
+	struct msm_asoc_mach_data *pdata;
+	struct qpnp_vadc_result result;
+	struct qpnp_vadc_chip *moisture_vadc;
+	int adc;
+
+	if (jack->card == NULL) {
+		pr_err("%s card is NULL\n", __func__);
+		return -1;
+	}
+
+	card = jack->card;
+	pdata = snd_soc_card_get_drvdata(card);
+	moisture_vadc = qpnp_get_vadc(card->dev,
+		"moisture-read");
+	qpnp_vadc_read(moisture_vadc, pdata->moisture_channel, &result);
+
+	/* Get voltage in microvolts */
+	adc = ((int)result.physical)/1000;
+
+	return adc;
+}
+#endif /* CONFIG_SAMSUNG_JACK */
 
 static int msm_wsa881x_init(struct snd_soc_component *component)
 {
@@ -5805,6 +6377,23 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 			goto err;
 	}
 
+#ifdef CONFIG_SND_SOC_WCD_MBHC_USB_ANALOG
+	pdata->gnd_sel_gpio = of_get_named_gpio(card->dev->of_node,
+				"gnd-sel-gpio", 0);
+	if (pdata->gnd_sel_gpio >= 0) {
+		ret = gpio_request(pdata->gnd_sel_gpio, "gnd_sel_gpio");
+		if (ret < 0) {
+			pr_err("%s: failed to request gnd_sel_gpio %d\n", __func__, ret);
+		}
+		gpio_direction_output(pdata->gnd_sel_gpio, 0);
+	}
+#endif /* CONFIG_SND_SOC_WCD_MBHC_USB_ANALOG */
+
+#ifdef CONFIG_SND_SOC_CS35L41
+	card->codec_conf = cs35l41_conf;
+	card->num_configs = ARRAY_SIZE(cs35l41_conf);
+#endif
+
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
 	if (ret == -EPROBE_DEFER) {
 		if (codec_reg_done) {
@@ -5823,6 +6412,51 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	}
 	if (pdata->snd_card_val > INT_MAX_SND_CARD)
 		msm_ext_register_audio_notifier(pdev);
+
+#ifdef CONFIG_SAMSUNG_JACK
+	ret = of_property_read_u32(pdev->dev.of_node,
+		"qcom,amux_channel", &pdata->amux_channel);
+	if (ret < 0) {
+		dev_err(card->dev,
+			"%s: missing amux_channel in dt node\n",
+			__func__);
+		goto err;
+	}
+	dev_dbg(&pdev->dev, "amux_channel 0x%x\n", pdata->amux_channel);
+
+	ret = of_property_read_u32(pdev->dev.of_node,
+		"qcom,moisture-channel", &pdata->moisture_channel);
+	if (ret < 0)
+		dev_info(card->dev,
+			"doesn`t support moisture detection\n");
+	else
+		dev_dbg(&pdev->dev, "moisture_channel 0x%x\n",
+			pdata->moisture_channel);
+
+	jack_controls.set_micbias = msm_set_micbias;
+	jack_controls.get_adc = msm_get_adc;
+	jack_controls.get_moisture_adc = msm_get_moisture_adc;
+	jack_controls.snd_card_registered = 1;
+
+	mutex_init(&jack_mutex);
+
+	hs_jack.card = card;
+#endif /* CONFIG_SAMSUNG_JACK */
+	pdata->dmic_ldo_en = of_get_named_gpio(pdev->dev.of_node,
+				"qcom,dmic-ldo-en", 0);
+
+	if (pdata->dmic_ldo_en >= 0) {
+		dev_dbg(&pdev->dev, "%s: dmic_ldo_en gpio request %d", __func__,
+			pdata->dmic_ldo_en);
+		ret = gpio_request(pdata->dmic_ldo_en, "dmic_ldo_en");
+		if (ret) {
+			dev_err(card->dev,
+				"%s: Failed to request dmic_ldo_en gpio %d error %d\n",
+				__func__, pdata->dmic_ldo_en, ret);
+		} else {
+			gpio_direction_output(pdata->dmic_ldo_en, 1);
+		}
+	}
 
 	return 0;
 err:
@@ -5866,6 +6500,10 @@ static int msm_asoc_machine_remove(struct platform_device *pdev)
 	if (gpio_is_valid(pdata->hph_en0_gpio)) {
 		gpio_free(pdata->hph_en0_gpio);
 		pdata->hph_en0_gpio = 0;
+	}
+	if (gpio_is_valid(pdata->dmic_ldo_en))	{
+		gpio_free(pdata->dmic_ldo_en);
+		pdata->dmic_ldo_en = 0;
 	}
 
 	if (pdata->snd_card_val > INT_MAX_SND_CARD)
