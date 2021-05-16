@@ -32,6 +32,12 @@
 #include <linux/fs.h>
 #include <linux/bio.h>
 #include <linux/sched.h>
+#ifdef CONFIG_RKP_KDP
+#include <linux/kdp.h>
+#else
+#define RKP_RO_AREA   
+#define security_integrity_current()  0	
+#endif
 
 struct linux_binprm;
 struct cred;
