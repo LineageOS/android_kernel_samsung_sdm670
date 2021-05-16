@@ -145,6 +145,11 @@
 		pinctrl-1 = <&earjack_det_act &earjack_switch_act>;
 		pinctrl-2 = <&earjack_det_sus &earjack_switch_sus>;
 	};
+
+	qcom,msm-dai-tdm-pri-rx {
+		qcom,msm-cpudai-tdm-afe-ebit-unsupported;
+	};
+
 	qcom,msm-dai-tdm-sec-rx {
 		qcom,msm-cpudai-tdm-clk-internal = <1>;
 		qcom,msm-cpudai-tdm-sync-mode = <0>;
