@@ -48,6 +48,8 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_CQ0093VC if MFD_DAVINCI_VOICECODEC
 	select SND_SOC_CS35L32 if I2C
 	select SND_SOC_CS35L33 if I2C
+	select SND_SOC_CS35L41_I2C if I2C
+	select SND_SOC_CS35L41_SPI if SPI_MASTER
 	select SND_SOC_CS42L51_I2C if I2C
 	select SND_SOC_CS42L52 if I2C && INPUT
 	select SND_SOC_CS42L56 if I2C && INPUT
@@ -203,7 +205,6 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_WM9705 if SND_SOC_AC97_BUS
 	select SND_SOC_WM9712 if SND_SOC_AC97_BUS
 	select SND_SOC_WM9713 if SND_SOC_AC97_BUS
-	select SND_SOC_AW8896 if I2C
 	select SND_SOC_TFA98XX if I2C
         help
           Normally ASoC codec drivers are only built if a machine driver which
@@ -248,6 +249,7 @@ config SND_SOC_WM_ADSP
 	default m if SND_SOC_WM5102=m
 	default m if SND_SOC_WM5110=m
 	default m if SND_SOC_WM2200=m
+	default y if SND_SOC_CS35L41=y
 
 config SND_SOC_AB8500_CODEC
 	tristate
@@ -400,6 +402,10 @@ config SND_SOC_CS35L32
 config SND_SOC_CS35L33
 	tristate "Cirrus Logic CS35L33 CODEC"
 	depends on I2C
+
+config SND_SOC_CS35L41
+	tristate "Cirrus Logic CS35L41 CODEC"
+	select SND_SOC_WM_ADSP
 
 config SND_SOC_CS42L51
 	tristate
@@ -1091,11 +1097,14 @@ config SND_SOC_TPA6130A2
 	tristate "Texas Instruments TPA6130A2 headphone amplifier"
 	depends on I2C
 
-config SND_SOC_AW8896
-	tristate "SoC Audio for awinic aw8896 series"
+config SND_SOC_TFA9872
+	tristate "Support TFA9872"
 	depends on I2C
 	help
-	  Enables support for aw8896 series Smart PA.
+	TFA9872 driver	
+
+# DBMDx
+source "sound/soc/codecs/dbmdx/Kconfig"	
 
 config SND_SOC_TFA98XX
 	tristate "NXP Semiconductors TFA98XX amplifier"
