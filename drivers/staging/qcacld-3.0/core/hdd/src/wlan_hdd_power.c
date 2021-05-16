@@ -1626,6 +1626,10 @@ QDF_STATUS hdd_wlan_re_init(void)
 		hdd_ssr_restart_sap(hdd_ctx);
 	hdd_is_interface_down_during_ssr(hdd_ctx);
 	hdd_wlan_ssr_reinit_event();
+#ifdef SEC_CONFIG_POWER_BACKOFF
+	cur_sec_sar_index = 0;
+#endif /* SEC_CONFIG_POWER_BACKOFF */
+
 	return QDF_STATUS_SUCCESS;
 
 err_re_init:
