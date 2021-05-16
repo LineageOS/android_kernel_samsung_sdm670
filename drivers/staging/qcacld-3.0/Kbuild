@@ -3285,6 +3285,27 @@ cppflags-$(CONFIG_IPA_SET_RESET_TX_DB_PA) += -DIPA_SET_RESET_TX_DB_PA
 
 KBUILD_CPPFLAGS += $(cppflags-y)
 
+########## SAMSUNG FEATURE ###########
+CONFIG_WLAN_SAMSUNG_FEATURE=y
+
+ifeq ($(CONFIG_WLAN_SAMSUNG_FEATURE), y)
+EXTRA_CFLAGS += -DCONFIG_SEC
+EXTRA_CFLAGS += -DSEC_READ_MACADDR_SYSFS
+EXTRA_CFLAGS += -DSEC_CONFIG_PSM_SYSFS
+ifeq ($(CONFIG_LITHIUM), n)
+EXTRA_CFLAGS += -DSEC_CONFIG_POWER_BACKOFF
+EXTRA_CFLAGS += -DSEC_CONFIG_WLAN_BEACON_CHECK
+endif
+EXTRA_CFLAGS += -DSEC_WRITE_VERSION_IN_SYSFS
+EXTRA_CFLAGS += -DSEC_WRITE_SOFTAP_INFO_IN_SYSFS
+#EXTRA_CFLAGS += -DSEC_WRITE_ANT_GPIO_INFO_IN_SYSFS
+
+ifeq ($(shell secgetspf SEC_PRODUCT_FEATURE_WLAN_SUPPORT_MIMO), TRUE)
+EXTRA_CFLAGS += -DSEC_CONFIG_SUPPORT_MIMO
+endif
+
+endif
+
 # Currently, for versions of gcc which support it, the kernel Makefile
 # is disabling the maybe-uninitialized warning.  Re-enable it for the
 # WLAN driver.  Note that we must use ccflags-y here so that it
