@@ -136,6 +136,10 @@
 		#list-det-cells = <2>;
 	};
 
+	qcom,msm-dai-tdm-pri-rx {
+		qcom,msm-cpudai-tdm-afe-ebit-unsupported;
+	};
+
 	qcom,msm-dai-tdm-sec-rx {
 		qcom,msm-cpudai-tdm-clk-internal = <1>;
 		qcom,msm-cpudai-tdm-sync-mode = <0>;
