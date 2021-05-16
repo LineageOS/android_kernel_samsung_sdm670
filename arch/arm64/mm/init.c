@@ -37,6 +37,9 @@
 #include <linux/swiotlb.h>
 #include <linux/vmalloc.h>
 #include <linux/mm.h>
+#ifdef CONFIG_UH_RKP
+#include <linux/rkp.h>
+#endif
 
 #include <asm/boot.h>
 #include <asm/fixmap.h>
@@ -502,6 +505,9 @@ void __init mem_init(void)
 	}
 }
 
+#ifdef CONFIG_UH_RKP
+u8 rkp_def_init_done = 0;
+#endif
 void free_initmem(void)
 {
 	free_reserved_area(lm_alias(__init_begin),
@@ -513,6 +519,12 @@ void free_initmem(void)
 	 * is not supported by kallsyms.
 	 */
 	unmap_kernel_range((u64)__init_begin, (u64)(__init_end - __init_begin));
+#ifdef CONFIG_UH_RKP
+	rkp_def_init_done = 1;
+	isb();
+	uh_call(UH_APP_RKP, RKP_DEFERRED_START, 0, 0, 0, 0);
+#endif
+
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD
