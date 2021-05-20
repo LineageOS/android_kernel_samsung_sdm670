@@ -9,9 +9,6 @@
 #include <asm/barrier.h>
 #include <linux/compiler.h>
 #include <linux/const.h>
-#ifdef DEFEX_DSMS_ENABLE
-#include <linux/dsms.h>
-#endif
 #include <linux/file.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -23,9 +20,6 @@
 #include <linux/slab.h>
 #include <linux/sched.h>
 #include <linux/stddef.h>
-#ifdef DEFEX_DSMS_ENABLE
-#include <linux/string.h>
-#endif
 #include <linux/syscalls.h>
 #include <linux/unistd.h>
 #include <linux/version.h>
@@ -79,69 +73,6 @@ __visible_for_testing struct task_struct *get_parent_task(const struct task_stru
 	read_unlock(&tasklist_lock);
 	return parent;
 }
-
-#ifdef DEFEX_DSMS_ENABLE
-
-#	define PED_VIOLATION "DFX1"
-#	define SAFEPLACE_VIOLATION "DFX2"
-#	define INTEGRITY_VIOLATION "DFX3"
-#	define IMMUTABLE_VIOLATION "DFX4"
-#	define MESSAGE_BUFFER_SIZE 200
-#	define STORED_CREDS_SIZE 100
-
-__visible_for_testing void defex_report_violation(const char *violation, uint64_t counter, struct defex_context *dc,
-	uid_t stored_uid, uid_t stored_fsuid, uid_t stored_egid, int case_num)
-{
-	int usermode_result;
-	char message[MESSAGE_BUFFER_SIZE + 1];
-
-	struct task_struct *parent = NULL, *p = dc->task;
-	const uid_t uid = uid_get_value(dc->cred.uid);
-	const uid_t euid = uid_get_value(dc->cred.euid);
-	const uid_t fsuid = uid_get_value(dc->cred.fsuid);
-	const uid_t egid = uid_get_value(dc->cred.egid);
-	const char *process_name = p->comm;
-	const char *prt_process_name = NULL;
-	const char *program_path = get_dc_process_name(dc);
-	char *prt_program_path = NULL;
-	char *file_path = NULL;
-	char stored_creds[STORED_CREDS_SIZE + 1];
-
-	parent = get_parent_task(p);
-	if (!parent)
-		return;
-
-	prt_process_name = parent->comm;
-	prt_program_path = defex_get_filename(parent);
-
-	if (dc->target_file && !case_num) {
-		file_path = get_dc_target_name(dc);
-	} else {
-		snprintf(stored_creds, sizeof(stored_creds), "[%ld, %ld, %ld]", (long)stored_uid, (long)stored_fsuid, (long)stored_egid);
-		stored_creds[sizeof(stored_creds) - 1] = 0;
-	}
-#ifdef DEFEX_DEPENDING_ON_OEMUNLOCK
-	snprintf(message, sizeof(message), "%d, %d, sc=%d, tsk=%s(%s), %s(%s), [%ld %ld %ld %ld], %s%s, %d", warranty_bit, boot_state_unlocked, dc->syscall_no, process_name, program_path, prt_process_name,
-		prt_program_path, (long)uid, (long)euid, (long)fsuid, (long)egid,
-		(file_path ? "file=" : "stored "), (file_path ? file_path : stored_creds), case_num);
-#else
-	snprintf(message, sizeof(message), "sc=%d, tsk=%s(%s), %s(%s), [%ld %ld %ld %ld], %s%s, %d",
-		dc->syscall_no, process_name, program_path, prt_process_name,
-		prt_program_path, (long)uid, (long)euid, (long)fsuid, (long)egid,
-		(file_path ? "file=" : "stored "), (file_path ? file_path : stored_creds), case_num);
-#endif
-	message[sizeof(message) - 1] = 0;
-
-	usermode_result = dsms_send_message(violation, message, counter);
-#ifdef DEFEX_DEBUG_ENABLE
-	printk(KERN_ERR "DEFEX Violation : feature=%s value=%ld, detail=[%s]", violation, (long)counter, message);
-	printk(KERN_ERR "DEFEX Result : %d\n", usermode_result);
-#endif /* DEFEX_DEBUG_ENABLE */
-
-	safe_str_free(prt_program_path);
-	put_task_struct(parent);
-}
-#endif /* DEFEX_DSMS_ENABLE */
 
 #ifdef DEFEX_SAFEPLACE_ENABLE
 __visible_for_testing long kill_process(struct task_struct *p)
@@ -372,10 +303,6 @@ trigger_violation:
 	pr_crit("defex[%d]: stored [euid=%d fsuid=%d egid=%d] current [uid=%d euid=%d fsuid=%d egid=%d]\n",
 		case_num, ref_uid, ref_fsuid, ref_egid, cur_uid, cur_euid, cur_fsuid, cur_egid);
 
-#ifdef DEFEX_DSMS_ENABLE
-	defex_report_violation(PED_VIOLATION, 0, dc, ref_uid, ref_fsuid, ref_egid, case_num);
-#endif /* DEFEX_DSMS_ENABLE */
-
 exit:
 	return -DEFEX_DENY;
 }
@@ -410,9 +337,6 @@ __visible_for_testing int task_defex_safeplace(struct defex_context *dc)
 		if (is_violation == DEFEX_INTEGRITY_FAIL) {
 			pr_crit("defex: integrity violation [task=%s (%s), child=%s, uid=%d]\n",
 				p->comm, proc_file, new_file, uid_get_value(dc->cred.uid));
-#ifdef DEFEX_DSMS_ENABLE
-			defex_report_violation(INTEGRITY_VIOLATION, 0, dc, 0, 0, 0, 0);
-#endif /* DEFEX_DSMS_ENABLE */
 
 			/*  Temporary make permissive mode for tereble
 			 *  system image is changed as google's and defex might not work
@@ -424,9 +348,6 @@ __visible_for_testing int task_defex_safeplace(struct defex_context *dc)
 		{
 			pr_crit("defex: safeplace violation [task=%s (%s), child=%s, uid=%d]\n",
 				p->comm, proc_file, new_file, uid_get_value(dc->cred.uid));
-#ifdef DEFEX_DSMS_ENABLE
-			defex_report_violation(SAFEPLACE_VIOLATION, 0, dc, 0, 0, 0, 0);
-#endif /* DEFEX_DSMS_ENABLE */
 		}
 	}
 out:
@@ -475,9 +396,6 @@ __visible_for_testing int task_defex_immutable(struct defex_context *dc, int att
 		proc_file = get_dc_process_name(dc);
 		pr_crit("defex: immutable %s violation [task=%s (%s), access to:%s]\n",
 			(attribute==feature_immutable_path_open)?"open":"write", p->comm, proc_file, new_file);
-#ifdef DEFEX_DSMS_ENABLE
- 		defex_report_violation(IMMUTABLE_VIOLATION, 0, dc, 0, 0, 0, 0);
-#endif /* DEFEX_DSMS_ENABLE */
 	}
 out:
 	return ret;
