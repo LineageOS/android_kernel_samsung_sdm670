@@ -148,11 +148,6 @@ else
 fw-shipped-$(CONFIG_SENSORS_A96T3X6) += abov/a96t326_a8sqlte.fw
 endif
 
-# FIVE
-ifeq ($(CONFIG_FIVE_TEE_DRIVER),y)
-include $(srctree)/firmware/five/Makefile
-endif
-
 #FPGA
 fw-shipped-$(CONFIG_POGO_FPGA) += fpga/pogo_fpga.fw
 fw-shipped-all := $(fw-shipped-y) $(fw-shipped-m) $(fw-shipped-)

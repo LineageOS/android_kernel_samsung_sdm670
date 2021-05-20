@@ -197,10 +197,6 @@ obj-$(CONFIG_SENSORS_FINGERPRINT)	+= fingerprint/
 # mobicore
 obj-$(CONFIG_TRUSTONIC_TEE)	+= gud/
 
-# FIVE TEE driver
-obj-$(CONFIG_FIVE_TEE_DRIVER)	+= security/samsung/five_tee_driver/
-obj-$(CONFIG_ICD)		+= security/samsung/icdrv/
-
 # Motor
 obj-y				+= motor/
 

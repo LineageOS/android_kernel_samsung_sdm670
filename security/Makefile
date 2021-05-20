@@ -36,10 +36,6 @@ obj-$(CONFIG_SECURITY_DSMS)		+= samsung/dsms/
 subdir-$(CONFIG_INTEGRITY)		+= integrity
 obj-$(CONFIG_INTEGRITY)			+= integrity/
 
-# FIVE
-subdir-$(CONFIG_FIVE)			+= samsung/five
-obj-$(CONFIG_FIVE)			+= samsung/five/
-
 # PROCA module
 subdir-$(CONFIG_PROCA)		+= proca
 obj-$(CONFIG_PROCA)		+= proca/
