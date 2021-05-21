@@ -181,6 +181,9 @@ int inode_init_always(struct super_block *sb, struct inode *inode)
 	mapping_set_gfp_mask(mapping, GFP_HIGHUSER_MOVABLE);
 	mapping->private_data = NULL;
 	mapping->writeback_index = 0;
+#if defined(CONFIG_SDP) && !defined(CONFIG_FSCRYPT_SDP)
+	mapping->userid = 0;
+#endif
 	inode->i_private = NULL;
 	inode->i_mapping = mapping;
 	INIT_HLIST_HEAD(&inode->i_dentry);	/* buggered by rcu freeing */
@@ -1844,6 +1847,7 @@ int file_update_time(struct file *file)
 	struct inode *inode = file_inode(file);
 	struct timespec now;
 	int sync_it = 0;
+	int need_sync = 0;
 	int ret;
 
 	/* First try to exhaust all avenues to not sync */
