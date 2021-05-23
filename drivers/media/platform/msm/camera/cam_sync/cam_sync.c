@@ -266,11 +266,12 @@ int cam_sync_signal(int32_t sync_obj, uint32_t status)
 			spin_unlock_bh(&sync_dev->row_spinlocks[list_info->sync_obj]);
 			continue;
 		}
-		trace_printk("sync_signal: signalable sync obj = %d state = %d\n", list_info->sync_obj, signalable_row->state);
+		CAM_DBG(CAM_SYNC, "sync_signal: signalable sync obj = %d state = %d\n",
+			list_info->sync_obj, signalable_row->state);
 		/* Dispatch kernel callbacks if any were registered earlier */
 		list_for_each_entry_safe(sync_cb,
 			temp_sync_cb, &signalable_row->callback_list, list) {
-		trace_printk("sync_signal: KMD cb queueed for %d\n", sync_cb->sync_obj);
+		CAM_DBG(CAM_SYNC, "sync_signal: KMD cb queueed for %d\n", sync_cb->sync_obj);
 			sync_cb->status = list_info->status;
 		list_del_init(&sync_cb->list);
 			queue_work(sync_dev->work_queue,
