@@ -342,6 +342,7 @@ struct dwc3_msm {
 	dma_addr_t		dummy_gsi_db_dma;
 	u64			*dummy_gevntcnt;
 	dma_addr_t		dummy_gevntcnt_dma;	
+	bool usb_data_enabled;
 };
 
 #define USB_HSPHY_3P3_VOL_MIN		3050000 /* uV */
@@ -3388,6 +3389,9 @@ static int dwc3_msm_id_notifier(struct notifier_block *nb,
 	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
 	enum dwc3_id_state id;
 
+	if (!mdwc->usb_data_enabled)
+		return NOTIFY_DONE;
+
 	id = event ? DWC3_ID_GROUND : DWC3_ID_FLOAT;
 
 	dev_dbg(mdwc->dev, "host:%ld (id:%d) event received\n", event, id);
@@ -3522,6 +3526,9 @@ static int dwc3_msm_vbus_notifier(struct notifier_block *nb,
 	dev_dbg(mdwc->dev, "vbus:%ld event received\n", event);
 
 	if (mdwc->vbus_active == event)
+		return NOTIFY_DONE;
+
+	if (!mdwc->usb_data_enabled)
 		return NOTIFY_DONE;
 
 	mdwc->vbus_active = event;
@@ -3863,8 +3870,35 @@ static ssize_t xhci_link_compliance_store(struct device *dev,
 
 	return ret;
 }
-
 static DEVICE_ATTR_RW(xhci_link_compliance);
+
+static ssize_t usb_data_enabled_show(struct device *dev,
+				     struct device_attribute *attr, char *buf)
+{
+	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
+
+	return sysfs_emit(buf, "%s\n",
+			  mdwc->usb_data_enabled ? "enabled" : "disabled");
+}
+
+static ssize_t usb_data_enabled_store(struct device *dev,
+				      struct device_attribute *attr,
+				      const char *buf, size_t count)
+{
+	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
+
+	if (kstrtobool(buf, &mdwc->usb_data_enabled))
+		return -EINVAL;
+
+	if (!mdwc->usb_data_enabled) {
+		mdwc->vbus_active = false;
+		mdwc->id_state = DWC3_ID_FLOAT;
+		dwc3_ext_event_notify(mdwc);
+	}
+
+	return count;
+}
+static DEVICE_ATTR_RW(usb_data_enabled);
 
 static int dwc3_msm_probe(struct platform_device *pdev)
 {
@@ -4232,10 +4266,13 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 	}
 #endif
 
+	/* set the initial value */
+	mdwc->usb_data_enabled = true;
 	device_create_file(&pdev->dev, &dev_attr_mode);
 	device_create_file(&pdev->dev, &dev_attr_speed);
 	device_create_file(&pdev->dev, &dev_attr_usb_compliance_mode);
 	device_create_file(&pdev->dev, &dev_attr_xhci_link_compliance);
+	device_create_file(&pdev->dev, &dev_attr_usb_data_enabled);
 
 	host_mode = usb_get_dr_mode(&mdwc->dwc3->dev) == USB_DR_MODE_HOST;
 #ifndef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
@@ -4284,6 +4321,7 @@ static int dwc3_msm_remove(struct platform_device *pdev)
 
 	device_remove_file(&pdev->dev, &dev_attr_mode);
 	device_remove_file(&pdev->dev, &dev_attr_xhci_link_compliance);
+	device_remove_file(&pdev->dev, &dev_attr_usb_data_enabled);
 	if (mdwc->usb_psy)
 		power_supply_put(mdwc->usb_psy);
 
