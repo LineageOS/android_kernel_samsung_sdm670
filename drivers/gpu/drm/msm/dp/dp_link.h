@@ -109,6 +109,7 @@ static inline char *dp_link_get_test_name(u32 test_requested)
 struct dp_link {
 	u32 sink_request;
 	u32 test_response;
+	int power_mode;
 
 #ifdef CONFIG_SEC_DISPLAYPORT
 	bool poor_connection;
