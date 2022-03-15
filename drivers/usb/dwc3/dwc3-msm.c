@@ -4225,6 +4225,9 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 	if (of_property_read_bool(node, "qcom,connector-type-uAB"))
 		mdwc->type_c = false;
 
+	/* set the initial value */
+	mdwc->usb_data_enabled = true;
+
 	mdwc->usb_psy = power_supply_get_by_name("usb");
 	if (!mdwc->usb_psy) {
 		dev_warn(mdwc->dev, "Could not get usb power_supply\n");
@@ -4265,8 +4268,6 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 	}
 #endif
 
-	/* set the initial value */
-	mdwc->usb_data_enabled = true;
 	device_create_file(&pdev->dev, &dev_attr_mode);
 	device_create_file(&pdev->dev, &dev_attr_speed);
 	device_create_file(&pdev->dev, &dev_attr_usb_compliance_mode);
