@@ -60,16 +60,6 @@ enum {
 	FM_SLIM8,
 	SLIM_MAX,
 };
-static unsigned int tdm_slot_offset[TDM_PORT_MAX][TDM_SLOT_OFFSET_MAX] = {
-	{0, 4, 8, 12, 0xFF},/* TX_0 | RX_0 */
-	{AFE_SLOT_MAPPING_OFFSET_INVALID},/* TX_1 | RX_1 */
-	{AFE_SLOT_MAPPING_OFFSET_INVALID},/* TX_2 | RX_2 */
-	{AFE_SLOT_MAPPING_OFFSET_INVALID},/* TX_3 | RX_3 */
-	{AFE_SLOT_MAPPING_OFFSET_INVALID},/* TX_4 | RX_4 */
-	{AFE_SLOT_MAPPING_OFFSET_INVALID},/* TX_5 | RX_5 */
-	{AFE_SLOT_MAPPING_OFFSET_INVALID},/* TX_6 | RX_6 */
-	{AFE_SLOT_MAPPING_OFFSET_INVALID},/* TX_7 | RX_7 */
-};
 
 static struct afe_clk_set int_mi2s_clk[INT_MI2S_MAX] = {
 	{

@@ -2069,7 +2069,6 @@ static int fastrpc_internal_invoke(struct fastrpc_file *fl, uint32_t mode,
 	int err = 0, cid = -1, interrupted = 0;
 	struct timespec invoket = {0};
 	int64_t *perf_counter = NULL;
-	struct fastrpc_apps *me = &gfa;
 
 	cid = fl->cid;
 	VERIFY(err, cid >= ADSP_DOMAIN_ID && cid < NUM_CHANNELS);

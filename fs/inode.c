@@ -1847,7 +1847,6 @@ int file_update_time(struct file *file)
 	struct inode *inode = file_inode(file);
 	struct timespec now;
 	int sync_it = 0;
-	int need_sync = 0;
 	int ret;
 
 	/* First try to exhaust all avenues to not sync */

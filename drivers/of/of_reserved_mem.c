@@ -276,7 +276,6 @@ void __init fdt_init_reserved_mem(void)
 		int len;
 		const __be32 *prop;
 		int err = 0;
-		bool nomap;
 
 		prop = of_get_flat_dt_prop(node, "phandle", &len);
 		if (!prop)
