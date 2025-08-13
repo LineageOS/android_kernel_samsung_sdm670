@@ -779,7 +779,7 @@ static ssize_t afc_off_store(struct device *dev,
 	if (!ret) {
 		pr_err("%s: set_param failed - %02x:(%d)\n",
 					__func__, param_val, ret);
-		return ret;
+		return size;
 	} else {
 		pr_info("%s:%s afc_disable:%d (AFC %s)\n", MUIC_DEV_NAME,
 		__func__, pdata->afc_disable, pdata->afc_disable ? "Diabled": "Enabled");
