@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "f9c7a7a3_b7a1661e",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2026-08-20T20:23:37Z",
+      "side": 1,
+      "message": "If these are just plain cherry-picks from mainline, please commit them as such.",
+      "revId": "b89df8330c8d35c52c8031f1e03f50dfe5b65313",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
