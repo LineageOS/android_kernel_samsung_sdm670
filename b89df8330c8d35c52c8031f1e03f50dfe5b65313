@@ -16,6 +16,24 @@
       "message": "If these are just plain cherry-picks from mainline, please commit them as such.",
       "revId": "b89df8330c8d35c52c8031f1e03f50dfe5b65313",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "4abfe2ff_57cfe3f3",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 37787
+      },
+      "writtenOn": "2026-08-20T21:17:18Z",
+      "side": 1,
+      "message": "Thanks for reviewing the code. Most of the code comes directly from\nupstream, but this is not an unmodified cherry-pick: it combines several\nupstream commits and includes the 4.9-specific hid_have_special_driver\nchange and the list_first_entry() compatibility adjustment.\n\nI followed the structure of the merged 4.9 backport in change 396564:\nhttps://review.lineageos.org/c/LineageOS/android_kernel_amlogic_linux-4.9/+/396564\n\nWould you prefer me to split it into individual upstream commits?",
+      "parentUuid": "f9c7a7a3_b7a1661e",
+      "revId": "b89df8330c8d35c52c8031f1e03f50dfe5b65313",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
