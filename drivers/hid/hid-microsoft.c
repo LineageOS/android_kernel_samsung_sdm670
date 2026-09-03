@@ -296,14 +296,16 @@ static int ms_play_effect(struct input_dev *dev, void *data,
 	return 0;
 }
 
-static int ms_init_ff(struct hid_device *hdev)
+static int ms_input_configured(struct hid_device *hdev,
+			       struct hid_input *hidinput)
 {
-	struct hid_input *hidinput = list_entry(hdev->inputs.next,
-						struct hid_input, list);
 	struct input_dev *input_dev = hidinput->input;
 	struct ms_data *ms = hid_get_drvdata(hdev);
 
 	if (!(ms->quirks & MS_QUIRK_FF))
+		return 0;
+
+	if (hidinput != list_first_entry(&hdev->inputs, struct hid_input, list))
 		return 0;
 
 	ms->hdev = hdev;
@@ -317,16 +319,6 @@ static int ms_init_ff(struct hid_device *hdev)
 
 	input_set_capability(input_dev, EV_FF, FF_RUMBLE);
 	return input_ff_create_memless(input_dev, NULL, ms_play_effect);
-}
-
-static void ms_remove_ff(struct hid_device *hdev)
-{
-	struct ms_data *ms = hid_get_drvdata(hdev);
-
-	if (!(ms->quirks & MS_QUIRK_FF))
-		return;
-
-	cancel_work_sync(&ms->ff_worker);
 }
 
 static int ms_probe(struct hid_device *hdev, const struct hid_device_id *id)
@@ -349,29 +341,22 @@ static int ms_probe(struct hid_device *hdev, const struct hid_device_id *id)
 	ret = hid_parse(hdev);
 	if (ret) {
 		hid_err(hdev, "parse failed\n");
-		goto err_free;
+		return ret;
 	}
 
 	ret = hid_hw_start(hdev, HID_CONNECT_DEFAULT | ((quirks & MS_HIDINPUT) ?
 				HID_CONNECT_HIDINPUT_FORCE : 0));
 	if (ret) {
 		hid_err(hdev, "hw start failed\n");
-		goto err_free;
+		return ret;
 	}
 
-	ret = ms_init_ff(hdev);
-	if (ret)
-		hid_err(hdev, "could not initialize ff, continuing anyway");
-
 	return 0;
-err_free:
-	return ret;
 }
 
 static void ms_remove(struct hid_device *hdev)
 {
 	hid_hw_stop(hdev);
-	ms_remove_ff(hdev);
 }
 
 static const struct hid_device_id ms_devices[] = {
@@ -435,6 +420,7 @@ static struct hid_driver ms_driver = {
 	.report_fixup = ms_report_fixup,
 	.input_mapping = ms_input_mapping,
 	.input_mapped = ms_input_mapped,
+	.input_configured = ms_input_configured,
 	.event = ms_event,
 	.probe = ms_probe,
 	.remove = ms_remove,
