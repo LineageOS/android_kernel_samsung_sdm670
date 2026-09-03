@@ -196,7 +196,8 @@ static int ms_input_mapped(struct hid_device *hdev, struct hid_input *hi,
 static int ms_event(struct hid_device *hdev, struct hid_field *field,
 		struct hid_usage *usage, __s32 value)
 {
-	unsigned long quirks = (unsigned long)hid_get_drvdata(hdev);
+	struct ms_data *ms = hid_get_drvdata(hdev);
+	unsigned long quirks = ms->quirks;
 	struct input_dev *input;
 
 	if (!(hdev->claimed & HID_CLAIMED_INPUT) || !field->hidinput ||
@@ -273,7 +274,7 @@ static void ms_ff_worker(struct work_struct *work)
 	r->magnitude[MAGNITUDE_WEAK] = ms->weak;     /* right actuator */
 
 	ret = hid_hw_output_report(hdev, (__u8 *)r, sizeof(*r));
-	if (ret)
+	if (ret < 0)
 		hid_warn(hdev, "failed to send FF report\n");
 }
 
@@ -289,8 +290,8 @@ static int ms_play_effect(struct input_dev *dev, void *data,
 	/*
 	 * Magnitude is 0..100 so scale the 16-bit input here
 	 */
-	ms->strong = ((u32) effect->u.rumble.strong_magnitude * 100) / U16_MAX;
-	ms->weak = ((u32) effect->u.rumble.weak_magnitude * 100) / U16_MAX;
+	ms->strong = ((u32)effect->u.rumble.strong_magnitude * 100) / U16_MAX;
+	ms->weak = ((u32)effect->u.rumble.weak_magnitude * 100) / U16_MAX;
 
 	schedule_work(&ms->ff_worker);
 	return 0;
@@ -299,13 +300,14 @@ static int ms_play_effect(struct input_dev *dev, void *data,
 static int ms_input_configured(struct hid_device *hdev,
 			       struct hid_input *hidinput)
 {
-	struct input_dev *input_dev = hidinput->input;
 	struct ms_data *ms = hid_get_drvdata(hdev);
+	struct input_dev *input_dev = hidinput->input;
 
 	if (!(ms->quirks & MS_QUIRK_FF))
 		return 0;
 
-	if (hidinput != list_first_entry(&hdev->inputs, struct hid_input, list))
+	if (hidinput != list_first_entry(&hdev->inputs,
+					 struct hid_input, list))
 		return 0;
 
 	ms->hdev = hdev;
@@ -314,7 +316,7 @@ static int ms_input_configured(struct hid_device *hdev,
 	ms->output_report_dmabuf = devm_kzalloc(&hdev->dev,
 						sizeof(struct xb1s_ff_report),
 						GFP_KERNEL);
-	if (ms->output_report_dmabuf == NULL)
+	if (!ms->output_report_dmabuf)
 		return -ENOMEM;
 
 	input_set_capability(input_dev, EV_FF, FF_RUMBLE);
@@ -328,7 +330,7 @@ static int ms_probe(struct hid_device *hdev, const struct hid_device_id *id)
 	int ret;
 
 	ms = devm_kzalloc(&hdev->dev, sizeof(*ms), GFP_KERNEL);
-	if (ms == NULL)
+	if (!ms)
 		return -ENOMEM;
 
 	ms->quirks = quirks;
@@ -341,17 +343,19 @@ static int ms_probe(struct hid_device *hdev, const struct hid_device_id *id)
 	ret = hid_parse(hdev);
 	if (ret) {
 		hid_err(hdev, "parse failed\n");
-		return ret;
+		goto err_free;
 	}
 
 	ret = hid_hw_start(hdev, HID_CONNECT_DEFAULT | ((quirks & MS_HIDINPUT) ?
 				HID_CONNECT_HIDINPUT_FORCE : 0));
 	if (ret) {
 		hid_err(hdev, "hw start failed\n");
-		return ret;
+		goto err_free;
 	}
 
 	return 0;
+err_free:
+	return ret;
 }
 
 static void ms_remove(struct hid_device *hdev)
@@ -398,17 +402,23 @@ static const struct hid_device_id ms_devices[] = {
 		.driver_data = MS_HIDINPUT },
 	{ HID_USB_DEVICE(USB_VENDOR_ID_MICROSOFT, USB_DEVICE_ID_MS_COMFORT_KEYBOARD),
 		.driver_data = MS_ERGONOMY},
+
 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MICROSOFT, USB_DEVICE_ID_MS_PRESENTER_8K_BT),
 		.driver_data = MS_PRESENTER },
-	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MICROSOFT, USB_DEVICE_ID_MS_XBOX_CONTROLLER_MODEL_1708),
+	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MICROSOFT,
+		USB_DEVICE_ID_MS_XBOX_CONTROLLER_MODEL_1708),
 		.driver_data = MS_QUIRK_FF },
-	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MICROSOFT, USB_DEVICE_ID_MS_XBOX_CONTROLLER_MODEL_1708_BLE),
+	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MICROSOFT,
+		USB_DEVICE_ID_MS_XBOX_CONTROLLER_MODEL_1708_BLE),
 		.driver_data = MS_QUIRK_FF },
-	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MICROSOFT, USB_DEVICE_ID_MS_XBOX_CONTROLLER_MODEL_1914),
+	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MICROSOFT,
+		USB_DEVICE_ID_MS_XBOX_CONTROLLER_MODEL_1914),
 		.driver_data = MS_QUIRK_FF },
-	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MICROSOFT, USB_DEVICE_ID_MS_XBOX_CONTROLLER_MODEL_1797),
+	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MICROSOFT,
+		USB_DEVICE_ID_MS_XBOX_CONTROLLER_MODEL_1797),
 		.driver_data = MS_QUIRK_FF },
-	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MICROSOFT, USB_DEVICE_ID_MS_XBOX_CONTROLLER_MODEL_1797_BLE),
+	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MICROSOFT,
+		USB_DEVICE_ID_MS_XBOX_CONTROLLER_MODEL_1797_BLE),
 		.driver_data = MS_QUIRK_FF },
 	{ }
 };
