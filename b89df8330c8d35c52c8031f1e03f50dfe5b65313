@@ -34,6 +34,24 @@
       "parentUuid": "f9c7a7a3_b7a1661e",
       "revId": "b89df8330c8d35c52c8031f1e03f50dfe5b65313",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "5c4242a8_b08ec9f1",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 37787
+      },
+      "writtenOn": "2026-09-03T23:48:15Z",
+      "side": 1,
+      "message": "OK comitted with cherry picks\n\n1. Backport of LineageOS commit 43b428c56bfb\n2. Backport of upstream commit 1cfc77a64b71\n3. Linux 4.9 integration fixes",
+      "parentUuid": "4abfe2ff_57cfe3f3",
+      "revId": "b89df8330c8d35c52c8031f1e03f50dfe5b65313",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
